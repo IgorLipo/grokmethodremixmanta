@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Sparkles, FileText, Loader2 } from "lucide-react";
+import { Brain, FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ToneSelector } from "@/components/ai/ToneSelector";
@@ -17,6 +17,7 @@ export default function AIPage() {
     setTone,
     generateSummary,
     regenerate,
+    cancel,
   } = useSummarizer();
 
   const handleGenerate = () => {
@@ -33,20 +34,27 @@ export default function AIPage() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-2">
-            <Sparkles className="h-6 w-6 text-accent" />
+            <Brain className="h-6 w-6 text-accent" />
             AI Report Summarizer
           </h1>
           <p className="text-sm text-muted-foreground">
-            Generate executive summaries from your financial data
+            Generate executive summaries from your financial data using AI
           </p>
         </div>
 
-        {/* Demo Notice */}
+        {/* AI Powered Notice */}
         <div className="mb-6 p-4 rounded-xl bg-accent/5 border border-accent/20">
-          <p className="text-sm text-foreground">
-            <strong>Demo Mode:</strong> This demo uses pre-generated summaries. 
-            In production, connect Lovable Cloud for real AI-powered analysis.
-          </p>
+          <div className="flex items-start gap-3">
+            <Brain className="h-5 w-5 text-accent mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-foreground">
+                Powered by Lovable AI
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Real-time AI analysis generates executive summaries tailored to your chosen tone.
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="space-y-6">
@@ -67,7 +75,7 @@ export default function AIPage() {
             </div>
             
             <Textarea
-              placeholder="Paste your financial data here, or click 'Use Sample Data' to try the demo..."
+              placeholder="Paste your financial data here, or click 'Use Sample Data' to try a demo..."
               value={inputData}
               onChange={(e) => setInputData(e.target.value)}
               rows={6}
@@ -84,24 +92,35 @@ export default function AIPage() {
             </div>
 
             {/* Generate Button */}
-            <Button
-              onClick={handleGenerate}
-              disabled={isGenerating}
-              className="w-full sm:w-auto gap-2"
-              size="lg"
-            >
-              {isGenerating ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4" />
-                  Generate Summary
-                </>
+            <div className="flex gap-3">
+              <Button
+                onClick={handleGenerate}
+                disabled={isGenerating}
+                className="gap-2"
+                size="lg"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Brain className="h-4 w-4" />
+                    Generate Summary
+                  </>
+                )}
+              </Button>
+              {isGenerating && (
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={cancel}
+                >
+                  Cancel
+                </Button>
               )}
-            </Button>
+            </div>
           </div>
 
           {/* Output Section */}
