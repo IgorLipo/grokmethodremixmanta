@@ -17,6 +17,7 @@ export default function ReportBuilder() {
     selectedModule,
     isPreviewOpen,
     isConfigOpen,
+    hasUnsavedChanges,
     addModule,
     duplicateModule,
     removeModule,
@@ -24,6 +25,9 @@ export default function ReportBuilder() {
     updateModuleConfig,
     setTitle,
     setPeriod,
+    setDateRange,
+    saveReport,
+    clearReport,
     openConfig,
     closeConfig,
     setIsPreviewOpen,
@@ -93,10 +97,15 @@ export default function ReportBuilder() {
             <ReportToolbar
               title={report.title}
               period={report.period}
+              dateRange={report.dateRange}
               onTitleChange={setTitle}
               onPeriodChange={setPeriod}
+              onDateRangeChange={setDateRange}
               onPreview={() => setIsPreviewOpen(true)}
+              onSave={saveReport}
+              onClear={clearReport}
               moduleCount={report.modules.length}
+              hasUnsavedChanges={hasUnsavedChanges}
             />
             <ReportCanvas
               modules={report.modules}

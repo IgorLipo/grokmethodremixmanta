@@ -1,26 +1,61 @@
 import { useState, useCallback, useEffect } from "react";
 import { CanvasModule, getModuleById, demoTemplates } from "@/data/mockReports";
+import { toast } from "sonner";
+import { DateRange } from "react-day-picker";
 
 export interface ReportState {
+  id: string;
   title: string;
   period: string;
+  dateRange?: DateRange;
   modules: CanvasModule[];
+  createdAt: string;
+  updatedAt: string;
 }
+
+const generateId = () => `report-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
 export function useReportBuilder() {
   const [report, setReport] = useState<ReportState>({
+    id: generateId(),
     title: "Untitled Report",
     period: "q3-2024",
     modules: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   });
 
-  // Check for template selection from sessionStorage on mount
+  const [selectedModule, setSelectedModule] = useState<CanvasModule | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // Check for template selection or edit report on mount
   useEffect(() => {
+    // Check for editing existing report
+    const editReportId = sessionStorage.getItem("editReportId");
+    if (editReportId) {
+      const savedReport = sessionStorage.getItem(`report-${editReportId}`);
+      if (savedReport) {
+        try {
+          const parsed = JSON.parse(savedReport);
+          setReport(parsed);
+          sessionStorage.removeItem("editReportId");
+          return;
+        } catch (e) {
+          console.error("Failed to load report:", e);
+        }
+      }
+      sessionStorage.removeItem("editReportId");
+    }
+
+    // Check for template selection
     const templateData = sessionStorage.getItem("selectedTemplate");
     if (templateData) {
       try {
         const template = JSON.parse(templateData);
         setReport({
+          id: generateId(),
           title: template.name,
           period: "q3-2024",
           modules: template.moduleIds.map((moduleId: string) => {
@@ -31,6 +66,8 @@ export function useReportBuilder() {
               config: module?.defaultConfig || {},
             };
           }),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         });
         sessionStorage.removeItem("selectedTemplate");
       } catch (e) {
@@ -39,9 +76,12 @@ export function useReportBuilder() {
     }
   }, []);
 
-  const [selectedModule, setSelectedModule] = useState<CanvasModule | null>(null);
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [isConfigOpen, setIsConfigOpen] = useState(false);
+  // Track unsaved changes
+  useEffect(() => {
+    if (report.modules.length > 0 || report.title !== "Untitled Report") {
+      setHasUnsavedChanges(true);
+    }
+  }, [report.modules, report.title]);
 
   const addModule = useCallback((moduleId: string) => {
     const module = getModuleById(moduleId);
@@ -56,6 +96,7 @@ export function useReportBuilder() {
     setReport((prev) => ({
       ...prev,
       modules: [...prev.modules, newCanvasModule],
+      updatedAt: new Date().toISOString(),
     }));
   }, []);
 
@@ -70,14 +111,17 @@ export function useReportBuilder() {
       const index = prev.modules.findIndex((m) => m.id === canvasModule.id);
       const newModules = [...prev.modules];
       newModules.splice(index + 1, 0, newCanvasModule);
-      return { ...prev, modules: newModules };
+      return { ...prev, modules: newModules, updatedAt: new Date().toISOString() };
     });
+    
+    toast.success("Module duplicated");
   }, []);
 
   const removeModule = useCallback((canvasId: string) => {
     setReport((prev) => ({
       ...prev,
       modules: prev.modules.filter((m) => m.id !== canvasId),
+      updatedAt: new Date().toISOString(),
     }));
   }, []);
 
@@ -92,7 +136,7 @@ export function useReportBuilder() {
       const [removed] = newModules.splice(oldIndex, 1);
       newModules.splice(newIndex, 0, removed);
 
-      return { ...prev, modules: newModules };
+      return { ...prev, modules: newModules, updatedAt: new Date().toISOString() };
     });
   }, []);
 
@@ -102,28 +146,91 @@ export function useReportBuilder() {
       modules: prev.modules.map((m) =>
         m.id === canvasId ? { ...m, config: { ...m.config, ...config } } : m
       ),
+      updatedAt: new Date().toISOString(),
     }));
   }, []);
 
   const setTitle = useCallback((title: string) => {
-    setReport((prev) => ({ ...prev, title }));
+    setReport((prev) => ({ ...prev, title, updatedAt: new Date().toISOString() }));
   }, []);
 
   const setPeriod = useCallback((period: string) => {
-    setReport((prev) => ({ ...prev, period }));
+    setReport((prev) => ({ ...prev, period, updatedAt: new Date().toISOString() }));
+  }, []);
+
+  const setDateRange = useCallback((dateRange: DateRange | undefined) => {
+    setReport((prev) => ({ ...prev, dateRange, updatedAt: new Date().toISOString() }));
   }, []);
 
   const loadTemplate = useCallback((moduleIds: string[]) => {
-    const modules: CanvasModule[] = moduleIds.map((moduleId) => ({
-      id: `${moduleId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      moduleId,
-      config: {},
-    }));
+    const modules: CanvasModule[] = moduleIds.map((moduleId) => {
+      const module = getModuleById(moduleId);
+      return {
+        id: `${moduleId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        moduleId,
+        config: module?.defaultConfig || {},
+      };
+    });
 
     setReport((prev) => ({
       ...prev,
       modules,
+      updatedAt: new Date().toISOString(),
     }));
+  }, []);
+
+  const saveReport = useCallback(() => {
+    // Save report to sessionStorage
+    const reportData = { ...report, updatedAt: new Date().toISOString() };
+    sessionStorage.setItem(`report-${report.id}`, JSON.stringify(reportData));
+
+    // Update saved reports list
+    const savedReportsList = sessionStorage.getItem("savedReports");
+    let reports: Array<{ id: string; title: string; period: string; moduleCount: number; createdAt: string; updatedAt: string }> = [];
+    
+    if (savedReportsList) {
+      try {
+        reports = JSON.parse(savedReportsList);
+      } catch {
+        reports = [];
+      }
+    }
+
+    // Check if report already exists
+    const existingIndex = reports.findIndex((r) => r.id === report.id);
+    const reportSummary = {
+      id: report.id,
+      title: report.title,
+      period: report.period,
+      moduleCount: report.modules.length,
+      createdAt: report.createdAt,
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (existingIndex >= 0) {
+      reports[existingIndex] = reportSummary;
+    } else {
+      reports.unshift(reportSummary);
+    }
+
+    sessionStorage.setItem("savedReports", JSON.stringify(reports));
+    setHasUnsavedChanges(false);
+
+    toast.success("Report saved!", {
+      description: `"${report.title}" has been saved to your session.`,
+    });
+  }, [report]);
+
+  const clearReport = useCallback(() => {
+    setReport({
+      id: generateId(),
+      title: "Untitled Report",
+      period: "q3-2024",
+      modules: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    setHasUnsavedChanges(false);
   }, []);
 
   const openConfig = useCallback((canvasModule: CanvasModule) => {
@@ -141,6 +248,7 @@ export function useReportBuilder() {
     selectedModule,
     isPreviewOpen,
     isConfigOpen,
+    hasUnsavedChanges,
     addModule,
     duplicateModule,
     removeModule,
@@ -148,7 +256,10 @@ export function useReportBuilder() {
     updateModuleConfig,
     setTitle,
     setPeriod,
+    setDateRange,
     loadTemplate,
+    saveReport,
+    clearReport,
     openConfig,
     closeConfig,
     setIsPreviewOpen,

@@ -16,6 +16,9 @@ import {
   LineChart,
   Line,
 } from "recharts";
+import { WaterfallChart } from "./charts/WaterfallChart";
+import { ComboChart } from "./charts/ComboChart";
+import { ForecastChart } from "./charts/ForecastChart";
 
 interface ModulePreviewProps {
   module: ReportModule;
@@ -105,8 +108,23 @@ export function ModulePreview({ module, config, compact = false }: ModulePreview
     );
   }
 
-  // Chart Preview
+  // Chart Preview - Handle special chart types
   if (module.type === "chart") {
+    // Waterfall chart
+    if (chartType === "waterfall" || module.id === "revenue_waterfall") {
+      return <WaterfallChart module={module} config={config} compact={compact} />;
+    }
+
+    // Combo chart (for burn rate analysis)
+    if (chartType === "combo" || module.id === "burn_rate_analysis") {
+      return <ComboChart module={module} config={config} compact={compact} />;
+    }
+
+    // Forecast chart with confidence intervals
+    if (module.id === "revenue_forecast" || module.id === "expense_forecast") {
+      return <ForecastChart module={module} config={config} compact={compact} />;
+    }
+
     const height = compact ? 120 : 180;
     
     if (chartType === "pie" || chartType === "donut") {
