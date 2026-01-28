@@ -1,4 +1,4 @@
-import { Copy, RefreshCw, Check } from "lucide-react";
+import { Copy, RefreshCw, Check, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -23,7 +23,10 @@ export function SummaryOutput({ summary, isGenerating, onRegenerate }: SummaryOu
     <div className="bg-card rounded-2xl border border-border overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30">
-        <h3 className="text-sm font-semibold text-foreground">Executive Summary</h3>
+        <div className="flex items-center gap-2">
+          <Brain className="h-4 w-4 text-accent" />
+          <h3 className="text-sm font-semibold text-foreground">Executive Summary</h3>
+        </div>
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
