@@ -10,6 +10,7 @@ import { ModuleConfigModal } from "@/components/reports/ModuleConfigModal";
 import { ReportPreviewModal } from "@/components/reports/ReportPreviewModal";
 import { MobileModuleDrawer } from "@/components/reports/MobileModuleDrawer";
 import { ReportComparisonView } from "@/components/reports/ReportComparisonView";
+import { ReportVersionHistory } from "@/components/reports/ReportVersionHistory";
 import { useReportBuilder } from "@/hooks/useReportBuilder";
 import { useKeyboardShortcuts, getShortcutLabel } from "@/hooks/useKeyboardShortcuts";
 import { getModuleById, iconMap } from "@/data/mockReports";
@@ -40,6 +41,7 @@ export default function ReportBuilder() {
     openConfig,
     closeConfig,
     setIsPreviewOpen,
+    restoreFromVersion,
   } = useReportBuilder();
 
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -107,6 +109,11 @@ export default function ReportBuilder() {
               </div>
             </TooltipContent>
           </Tooltip>
+          <ReportVersionHistory
+            reportId={report.id}
+            currentTitle={report.title}
+            onRestore={restoreFromVersion}
+          />
           <Button 
             variant="outline" 
             size="sm" 
