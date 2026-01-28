@@ -7,6 +7,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import Index from "./pages/Index";
 import Reports from "./pages/Reports";
 import ReportBuilder from "./pages/ReportBuilder";
+import ReportTemplates from "./pages/ReportTemplates";
 import Productivity from "./pages/Productivity";
 import Notifications from "./pages/Notifications";
 import Settings from "./pages/Settings";
@@ -26,6 +27,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/reports/new" element={<ReportBuilder />} />
+            <Route path="/reports/templates" element={<ReportTemplates />} />
             <Route path="/reports/:id" element={<ReportBuilder />} />
             <Route path="/productivity" element={<Productivity />} />
             <Route path="/notifications" element={<Notifications />} />

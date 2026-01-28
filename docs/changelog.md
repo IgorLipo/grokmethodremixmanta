@@ -1,5 +1,51 @@
 # Finance Pulse - Changelog
 
+## [Phase 2] - January 2026
+
+### Added
+- **Report Builder** (`src/pages/ReportBuilder.tsx`)
+  - Full drag-and-drop interface using @dnd-kit
+  - Module sidebar with collapsible categories
+  - Report canvas with sortable module cards
+  - Toolbar with title editing, period selector, preview/save/export actions
+
+- **Report Components** (`src/components/reports/`)
+  - `ModuleSidebar.tsx` - Draggable module palette with 3 categories
+  - `ReportCanvas.tsx` - Drop zone with sortable module cards
+  - `ReportToolbar.tsx` - Report header controls
+  - `ModuleConfigModal.tsx` - Per-module configuration options
+  - `ReportPreviewModal.tsx` - Simulated PDF preview
+
+- **Reports Page** (`src/pages/Reports.tsx`)
+  - Template quick-start cards
+  - Empty state for saved reports
+
+- **Templates Page** (`src/pages/ReportTemplates.tsx`)
+  - Full template browsing with module listings
+  - "Use Template" buttons
+
+- **Report Data** (`src/data/mockReports.ts`)
+  - 10 available modules across 3 categories
+  - 3 demo templates
+  - Period options and helper functions
+
+- **Report Builder Hook** (`src/hooks/useReportBuilder.ts`)
+  - Full state management for report building
+  - Module add/remove/reorder/configure
+
+### Dependencies Added
+- `@dnd-kit/core` - Drag and drop core
+- `@dnd-kit/sortable` - Sortable lists
+- `@dnd-kit/utilities` - CSS utilities
+
+### Technical Notes
+- Modules have 4 types: chart, table, metric, text
+- Config modal shows type-specific options
+- Preview shows simulated report output
+- Mobile shows "use desktop" message (touch D&D complex)
+
+---
+
 ## [Phase 1] - January 2026
 
 ### Added

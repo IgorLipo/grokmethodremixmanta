@@ -1,7 +1,7 @@
 # Finance Pulse - Sources of Truth
 
 ## Last Updated
-January 2026 - Phase 1 Complete
+January 2026 - Phase 2 Complete
 
 ---
 
@@ -10,9 +10,10 @@ January 2026 - Phase 1 Complete
 | Path | Page Component | Status |
 |------|----------------|--------|
 | `/` | `Index.tsx` | ✅ Complete |
-| `/reports` | `Reports.tsx` | ✅ Placeholder |
-| `/reports/new` | `ReportBuilder.tsx` | ✅ Placeholder |
-| `/reports/:id` | `ReportBuilder.tsx` | ✅ Placeholder |
+| `/reports` | `Reports.tsx` | ✅ Complete |
+| `/reports/new` | `ReportBuilder.tsx` | ✅ Complete |
+| `/reports/templates` | `ReportTemplates.tsx` | ✅ Complete |
+| `/reports/:id` | `ReportBuilder.tsx` | ✅ Complete |
 | `/productivity` | `Productivity.tsx` | ✅ Placeholder |
 | `/notifications` | `Notifications.tsx` | ✅ Placeholder |
 | `/settings` | `Settings.tsx` | ✅ Placeholder |
@@ -42,7 +43,7 @@ Defined in: `src/components/layout/AppShell.tsx`
 | File | Purpose |
 |------|---------|
 | `src/data/mockDashboard.ts` | Dashboard metrics, transactions, invoices, charts |
-| `src/data/mockReports.ts` | Report modules and templates (Phase 2) |
+| `src/data/mockReports.ts` | Report modules, templates, period options |
 | `src/data/mockTasks.ts` | Productivity tasks and cycles (Phase 3) |
 | `src/data/mockNotifications.ts` | Notification items (Phase 4) |
 | `src/data/mockSettings.ts` | User profile and preferences (Phase 4) |
@@ -56,7 +57,7 @@ Defined in: `src/components/layout/AppShell.tsx`
 | `src/components/dashboard/` | Dashboard-specific components |
 | `src/components/layout/` | App shell, navigation |
 | `src/components/ui/` | shadcn/ui primitives |
-| `src/components/reports/` | Report builder (Phase 2) |
+| `src/components/reports/` | Report builder components |
 | `src/components/productivity/` | Task tracking (Phase 3) |
 | `src/components/notifications/` | Notification UI (Phase 4) |
 | `src/components/settings/` | Settings forms (Phase 4) |
@@ -67,9 +68,9 @@ Defined in: `src/components/layout/AppShell.tsx`
 
 | Hook | Purpose | Status |
 |------|---------|--------|
+| `useReportBuilder` | Report builder state management | ✅ Complete |
 | `useNotifications` | Notification state | Phase 4 |
 | `useTasks` | Task management | Phase 3 |
-| `useReports` | Report builder state | Phase 2 |
 
 ---
 
