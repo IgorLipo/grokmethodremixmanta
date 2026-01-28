@@ -184,6 +184,10 @@ export function useReportBuilder() {
     const reportData = { ...report, updatedAt: new Date().toISOString() };
     sessionStorage.setItem(`report-${report.id}`, JSON.stringify(reportData));
 
+    // Save version history
+    const { saveReportVersion } = require("@/components/reports/ReportVersionHistory");
+    saveReportVersion(reportData);
+
     // Update saved reports list
     const savedReportsList = sessionStorage.getItem("savedReports");
     let reports: Array<{ id: string; title: string; period: string; moduleCount: number; createdAt: string; updatedAt: string }> = [];
@@ -220,6 +224,14 @@ export function useReportBuilder() {
       description: `"${report.title}" has been saved to your session.`,
     });
   }, [report]);
+
+  const restoreFromVersion = useCallback((snapshot: ReportState) => {
+    setReport({
+      ...snapshot,
+      updatedAt: new Date().toISOString(),
+    });
+    setHasUnsavedChanges(true);
+  }, []);
 
   const clearReport = useCallback(() => {
     setReport({
@@ -263,5 +275,6 @@ export function useReportBuilder() {
     openConfig,
     closeConfig,
     setIsPreviewOpen,
+    restoreFromVersion,
   };
 }
