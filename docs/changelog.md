@@ -1,5 +1,34 @@
 # Finance Pulse - Changelog
 
+## [Phase 5] - January 2026 (FINAL)
+
+### Added
+- **AI Report Summarizer** (`src/pages/AIPage.tsx`)
+  - Input area for financial data with sample data button
+  - Tone selector (Professional, Concise, Detailed)
+  - Simulated streaming text generation
+  - Copy to clipboard functionality
+
+- **AI Components** (`src/components/ai/`)
+  - `ToneSelector.tsx` - 3-option tone selection cards
+  - `SummaryOutput.tsx` - Streaming output with markdown rendering
+
+- **AI Hook** (`src/hooks/useSummarizer.ts`)
+  - Simulated streaming generation with word-by-word reveal
+  - Tone-specific demo summaries
+
+- **AI Data** (`src/data/mockAI.ts`)
+  - 3 pre-written summaries for each tone
+  - Sample financial data for demo
+
+### Technical Notes
+- Demo uses simulated streaming (30ms per word)
+- Summaries include markdown formatting (headers, bold, lists)
+- Copy button shows checkmark feedback
+- "Lovable Cloud required" notice for production use
+
+---
+
 ## [Phase 4] - January 2026
 
 ### Added

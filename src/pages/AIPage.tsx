@@ -1,32 +1,117 @@
-import { Construction, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { Sparkles, FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { ToneSelector } from "@/components/ai/ToneSelector";
+import { SummaryOutput } from "@/components/ai/SummaryOutput";
+import { useSummarizer } from "@/hooks/useSummarizer";
+import { sampleReportData } from "@/data/mockAI";
 
 export default function AIPage() {
+  const [inputData, setInputData] = useState("");
+  const {
+    summary,
+    tone,
+    isGenerating,
+    hasGenerated,
+    setTone,
+    generateSummary,
+    regenerate,
+  } = useSummarizer();
+
+  const handleGenerate = () => {
+    generateSummary(inputData || sampleReportData);
+  };
+
+  const handleUseSampleData = () => {
+    setInputData(sampleReportData.trim());
+  };
+
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-7xl px-4 py-8">
+      <div className="mx-auto max-w-4xl px-4 py-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-2">
             <Sparkles className="h-6 w-6 text-accent" />
             AI Report Summarizer
           </h1>
-          <p className="text-sm text-muted-foreground">Generate executive summaries with AI</p>
+          <p className="text-sm text-muted-foreground">
+            Generate executive summaries from your financial data
+          </p>
         </div>
 
-        {/* Placeholder */}
-        <div className="flex flex-col items-center justify-center py-24 text-center border-2 border-dashed border-border rounded-3xl bg-muted/20">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-accent/10 mb-4">
-            <Construction className="h-8 w-8 text-accent" />
-          </div>
-          <h2 className="text-lg font-medium text-foreground mb-2">Coming in Phase 5</h2>
-          <p className="text-sm text-muted-foreground max-w-sm mb-6">
-            AI-powered report summarization with Lovable AI integration.
+        {/* Demo Notice */}
+        <div className="mb-6 p-4 rounded-xl bg-accent/5 border border-accent/20">
+          <p className="text-sm text-foreground">
+            <strong>Demo Mode:</strong> This demo uses pre-generated summaries. 
+            In production, connect Lovable Cloud for real AI-powered analysis.
           </p>
-          <Button variant="outline" disabled>
-            <Sparkles className="h-4 w-4 mr-2" />
-            Generate Summary
-          </Button>
+        </div>
+
+        <div className="space-y-6">
+          {/* Input Section */}
+          <div className="bg-card rounded-2xl border border-border p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-accent" />
+                <h2 className="text-lg font-semibold text-foreground">Report Data</h2>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleUseSampleData}
+              >
+                Use Sample Data
+              </Button>
+            </div>
+            
+            <Textarea
+              placeholder="Paste your financial data here, or click 'Use Sample Data' to try the demo..."
+              value={inputData}
+              onChange={(e) => setInputData(e.target.value)}
+              rows={6}
+              className="resize-none mb-4"
+            />
+
+            {/* Tone Selector */}
+            <div className="mb-6">
+              <ToneSelector
+                value={tone}
+                onChange={setTone}
+                disabled={isGenerating}
+              />
+            </div>
+
+            {/* Generate Button */}
+            <Button
+              onClick={handleGenerate}
+              disabled={isGenerating}
+              className="w-full sm:w-auto gap-2"
+              size="lg"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  Generate Summary
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* Output Section */}
+          {(hasGenerated || isGenerating) && (
+            <SummaryOutput
+              summary={summary}
+              isGenerating={isGenerating}
+              onRegenerate={regenerate}
+            />
+          )}
         </div>
       </div>
     </div>
