@@ -7,6 +7,7 @@ import { AccountsPayable } from "@/components/dashboard/AccountsPayable";
 import { CashFlowChart } from "@/components/dashboard/CashFlowChart";
 import { SpendMixChart } from "@/components/dashboard/SpendMixChart";
 import { TeamActivity } from "@/components/dashboard/TeamActivity";
+import { RemixBanner } from "@/components/dashboard/RemixBanner";
 import { BarChart3, PieChart, Users, RefreshCw } from "lucide-react";
 import { 
   dashboardMetrics, 
@@ -20,6 +21,7 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-7xl px-4 py-8">
+        <RemixBanner />
         <Header period={currentPeriod} />
         
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
