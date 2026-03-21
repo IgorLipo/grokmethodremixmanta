@@ -178,9 +178,9 @@ export default function SiteReport() {
       return;
     }
     setSubmitting(true);
-    await supabase.from("site_reports").update({
+    await (supabase as any).from("site_reports").update({
       status: "submitted",
-      report_data: reportData as any,
+      report_data: reportData,
       submitted_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }).eq("id", reportId);
