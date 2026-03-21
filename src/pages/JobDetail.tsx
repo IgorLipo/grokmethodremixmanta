@@ -536,7 +536,7 @@ export default function JobDetail() {
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {photos.map((photo) => (
-                    <div key={photo.id} className="relative group rounded-xl overflow-hidden border border-border">
+                    <div key={photo.id} className="relative group rounded-xl overflow-hidden border border-border cursor-pointer" onClick={() => setFullscreenPhoto(photo.url)}>
                       <img src={photo.url} alt="Site photo" className="w-full h-32 object-cover" />
                       <div className="absolute top-1.5 right-1.5">
                         <span className={cn(
