@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Jobs from "./pages/Jobs";
 import JobDetail from "./pages/JobDetail";
+import SiteReport from "./pages/SiteReport";
 import Scaffolders from "./pages/Scaffolders";
 import Regions from "./pages/Regions";
 import NotificationsPage from "./pages/NotificationsPage";
@@ -45,6 +46,7 @@ function AppRoutes() {
         <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/jobs" element={<ProtectedRoute><Jobs /></ProtectedRoute>} />
         <Route path="/jobs/:id" element={<ProtectedRoute><JobDetail /></ProtectedRoute>} />
+        <Route path="/jobs/:id/report" element={<ProtectedRoute><SiteReport /></ProtectedRoute>} />
         <Route path="/scaffolders" element={<ProtectedRoute roles={["admin"]}><Scaffolders /></ProtectedRoute>} />
         <Route path="/regions" element={<ProtectedRoute roles={["admin"]}><Regions /></ProtectedRoute>} />
         <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
