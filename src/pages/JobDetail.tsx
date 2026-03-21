@@ -204,6 +204,24 @@ export default function JobDetail() {
     await supabase.from("photos").update({ review_status: status }).eq("id", photoId);
     toast({ title: `Photo ${status}` });
     logAudit(user?.id, `photo_${status}`, "photo", photoId);
+
+    // When admin approves photos, auto-assign all engineers to this job
+    if (status === "approved" && role === "admin") {
+      const { data: engRoles } = await supabase.from("user_roles").select("user_id").eq("role", "engineer");
+      if (engRoles) {
+        for (const eng of engRoles) {
+          // Check if not already assigned
+          const { data: existing } = await (supabase as any).from("job_assignments")
+            .select("id").eq("job_id", id).eq("scaffolder_id", eng.user_id).eq("assignment_role", "engineer").maybeSingle();
+          if (!existing) {
+            await (supabase as any).from("job_assignments").insert({
+              job_id: id, scaffolder_id: eng.user_id, assigned_by: user?.id, assignment_role: "engineer",
+            });
+            notifyEngineerAssigned(eng.user_id, job.title, id!);
+          }
+        }
+      }
+    }
     fetchAll();
   };
 
