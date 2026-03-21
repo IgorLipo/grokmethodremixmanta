@@ -105,6 +105,7 @@ export default function JobDetail() {
   const [chatTab, setChatTab] = useState("admin_owner");
   const [submissionConfirmed, setSubmissionConfirmed] = useState(false);
   const [profiles, setProfiles] = useState<Record<string, Scaffolder>>({});
+  const [fullscreenPhoto, setFullscreenPhoto] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
     if (!id) return;
