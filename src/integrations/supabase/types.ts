@@ -137,6 +137,9 @@ export type Database = {
           lng: number | null
           owner_id: string | null
           region_id: string | null
+          schedule_confirmed: boolean | null
+          schedule_notes: string | null
+          schedule_response: string | null
           scheduled_date: string | null
           scheduled_duration: number | null
           service_type: string | null
@@ -156,6 +159,9 @@ export type Database = {
           lng?: number | null
           owner_id?: string | null
           region_id?: string | null
+          schedule_confirmed?: boolean | null
+          schedule_notes?: string | null
+          schedule_response?: string | null
           scheduled_date?: string | null
           scheduled_duration?: number | null
           service_type?: string | null
@@ -175,6 +181,9 @@ export type Database = {
           lng?: number | null
           owner_id?: string | null
           region_id?: string | null
+          schedule_confirmed?: boolean | null
+          schedule_notes?: string | null
+          schedule_response?: string | null
           scheduled_date?: string | null
           scheduled_duration?: number | null
           service_type?: string | null
