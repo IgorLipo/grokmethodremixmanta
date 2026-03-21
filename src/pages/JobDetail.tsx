@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +16,7 @@ import {
   ArrowLeft, MapPin, Calendar, Camera, FileText, Upload,
   CheckCircle2, XCircle, DollarSign, Send, UserPlus, HardHat,
   ClipboardList, ChevronDown, ImagePlus, Pencil, History,
-  MessageSquare,
+  MessageSquare, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -72,6 +72,7 @@ interface AuditEntry {
 export default function JobDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { role, user } = useAuth();
   const { toast } = useToast();
   const [job, setJob] = useState<any>(null);
@@ -104,6 +105,7 @@ export default function JobDetail() {
   const [chatTab, setChatTab] = useState("admin_owner");
   const [submissionConfirmed, setSubmissionConfirmed] = useState(false);
   const [profiles, setProfiles] = useState<Record<string, Scaffolder>>({});
+  const [fullscreenPhoto, setFullscreenPhoto] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
     if (!id) return;
@@ -147,6 +149,21 @@ export default function JobDetail() {
   }, [id, role]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // Open sections based on URL hash
+  useEffect(() => {
+    const hash = location.hash;
+    if (hash === "#photos") setPhotosOpen(true);
+    if (hash === "#quotes") setQuotesOpen(true);
+    if (hash === "#chat") { /* chat is always visible */ }
+  }, [location.hash]);
+
+  // Show submission banner if owner and job is submitted/photo_review
+  useEffect(() => {
+    if (job && role === "owner" && ["submitted", "photo_review"].includes(job.status)) {
+      setSubmissionConfirmed(true);
+    }
+  }, [job?.status, role]);
 
   const updateStatus = async (newStatus: string) => {
     const oldStatus = job.status;
@@ -294,20 +311,25 @@ export default function JobDetail() {
     setEditSubmitting(false);
   };
 
-  const handleGuidedComplete = () => {
+  const handleGuidedComplete = async () => {
     setGuidedUploadOpen(false);
     setSubmissionConfirmed(true);
     fetchAll();
     toast({ title: "Photos submitted for review" });
     // Auto-submit the job
     if (job.status === "draft") {
-      supabase.from("jobs").update({ status: "submitted" as any, updated_at: new Date().toISOString() }).eq("id", id).then(() => {
-        setJob((prev: any) => ({ ...prev, status: "submitted" }));
-      });
+      await supabase.from("jobs").update({ status: "submitted" as any, updated_at: new Date().toISOString() }).eq("id", id);
+      setJob((prev: any) => ({ ...prev, status: "submitted" }));
     }
     // Notify the owner with confirmation message
     if (user?.id && id) {
       notifyOwnerPhotoSubmitted(user.id, job.title, id);
+    }
+    // Notify ALL admins that photos were submitted
+    if (id) {
+      const { data: adminRoles } = await supabase.from("user_roles").select("user_id").eq("role", "admin");
+      const aids = adminRoles?.map((r) => r.user_id) || [];
+      notifyPhotoUploaded(id, job.title, aids);
     }
   };
 
@@ -514,7 +536,7 @@ export default function JobDetail() {
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {photos.map((photo) => (
-                    <div key={photo.id} className="relative group rounded-xl overflow-hidden border border-border">
+                    <div key={photo.id} className="relative group rounded-xl overflow-hidden border border-border cursor-pointer" onClick={() => setFullscreenPhoto(photo.url)}>
                       <img src={photo.url} alt="Site photo" className="w-full h-32 object-cover" />
                       <div className="absolute top-1.5 right-1.5">
                         <span className={cn(
@@ -793,6 +815,29 @@ export default function JobDetail() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Fullscreen Photo Viewer */}
+      {fullscreenPhoto && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setFullscreenPhoto(null)}
+        >
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-4 right-4 text-white hover:bg-white/20 z-10"
+            onClick={() => setFullscreenPhoto(null)}
+          >
+            <X className="h-6 w-6" />
+          </Button>
+          <img
+            src={fullscreenPhoto}
+            alt="Full size photo"
+            className="max-w-full max-h-full object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }
