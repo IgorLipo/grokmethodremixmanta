@@ -1,10 +1,32 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, MapPin, Calendar, User } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  ArrowLeft,
+  MapPin,
+  Calendar,
+  Camera,
+  FileText,
+  Upload,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  DollarSign,
+  User,
+  Send,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -13,6 +35,13 @@ const statusMap: Record<string, string> = {
   quote_pending: "Quote Pending", quote_submitted: "Quote Submitted",
   negotiating: "Negotiating", scheduled: "Scheduled",
   in_progress: "In Progress", completed: "Completed", cancelled: "Cancelled",
+};
+
+const statusColor = (s: string) => {
+  if (s === "completed") return "bg-success/10 text-success";
+  if (s === "in_progress") return "bg-info/10 text-info";
+  if (s === "cancelled") return "bg-destructive/10 text-destructive";
+  return "bg-warning/10 text-warning";
 };
 
 const transitions: Record<string, string[]> = {
@@ -26,22 +55,53 @@ const transitions: Record<string, string[]> = {
   in_progress: ["completed", "cancelled"],
 };
 
+interface Quote {
+  id: string;
+  amount: number;
+  notes: string;
+  submitted_at: string;
+  review_decision: string | null;
+  scaffolder_id: string;
+  reviewed_by: string | null;
+}
+
+interface Photo {
+  id: string;
+  url: string;
+  review_status: string;
+  created_at: string;
+  uploader_id: string | null;
+}
+
 export default function JobDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const { toast } = useToast();
   const [job, setJob] = useState<any>(null);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [quoteOpen, setQuoteOpen] = useState(false);
+  const [quoteAmount, setQuoteAmount] = useState("");
+  const [quoteNotes, setQuoteNotes] = useState("");
+  const [submittingQuote, setSubmittingQuote] = useState(false);
 
-  useEffect(() => {
-    const fetch = async () => {
-      const { data } = await supabase.from("jobs").select("*").eq("id", id).single();
-      setJob(data);
-      setLoading(false);
-    };
-    if (id) fetch();
+  const fetchAll = useCallback(async () => {
+    if (!id) return;
+    const [jobRes, quotesRes, photosRes] = await Promise.all([
+      supabase.from("jobs").select("*").eq("id", id).maybeSingle(),
+      supabase.from("quotes").select("*").eq("job_id", id).order("submitted_at", { ascending: false }),
+      supabase.from("photos").select("*").eq("job_id", id).order("created_at", { ascending: false }),
+    ]);
+    if (jobRes.data) setJob(jobRes.data);
+    if (quotesRes.data) setQuotes(quotesRes.data as Quote[]);
+    if (photosRes.data) setPhotos(photosRes.data as Photo[]);
+    setLoading(false);
   }, [id]);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const updateStatus = async (newStatus: string) => {
     const { error } = await supabase.from("jobs").update({ status: newStatus as any, updated_at: new Date().toISOString() }).eq("id", id);
@@ -49,8 +109,70 @@ export default function JobDetail() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
       setJob({ ...job, status: newStatus });
-      toast({ title: `Status updated to ${statusMap[newStatus]}` });
+      toast({ title: `Status → ${statusMap[newStatus]}` });
     }
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !id || !user) return;
+    setUploading(true);
+    const ext = file.name.split(".").pop();
+    const path = `${id}/${Date.now()}.${ext}`;
+    const { error: uploadErr } = await supabase.storage.from("job-photos").upload(path, file);
+    if (uploadErr) {
+      toast({ title: "Upload failed", description: uploadErr.message, variant: "destructive" });
+      setUploading(false);
+      return;
+    }
+    const { data: urlData } = supabase.storage.from("job-photos").getPublicUrl(path);
+    await supabase.from("photos").insert({
+      job_id: id,
+      uploader_id: user.id,
+      url: urlData.publicUrl,
+      review_status: "pending",
+    });
+    toast({ title: "Photo uploaded" });
+    setUploading(false);
+    fetchAll();
+  };
+
+  const reviewPhoto = async (photoId: string, status: "approved" | "rejected") => {
+    await supabase.from("photos").update({ review_status: status }).eq("id", photoId);
+    toast({ title: `Photo ${status}` });
+    fetchAll();
+  };
+
+  const submitQuote = async () => {
+    if (!user || !id) return;
+    setSubmittingQuote(true);
+    const { error } = await supabase.from("quotes").insert({
+      job_id: id,
+      scaffolder_id: user.id,
+      amount: parseFloat(quoteAmount),
+      notes: quoteNotes,
+    });
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Quote submitted" });
+      setQuoteOpen(false);
+      setQuoteAmount("");
+      setQuoteNotes("");
+      fetchAll();
+    }
+    setSubmittingQuote(false);
+  };
+
+  const reviewQuote = async (quoteId: string, decision: "accepted" | "rejected" | "countered") => {
+    if (!user) return;
+    await supabase.from("quotes").update({
+      review_decision: decision,
+      reviewed_by: user.id,
+      reviewed_at: new Date().toISOString(),
+    }).eq("id", quoteId);
+    toast({ title: `Quote ${decision}` });
+    fetchAll();
   };
 
   if (loading) return <div className="p-8 text-muted-foreground">Loading...</div>;
@@ -64,41 +186,36 @@ export default function JobDetail() {
         <ArrowLeft className="h-4 w-4 mr-1" /> Back to Jobs
       </Button>
 
+      {/* Job Info */}
       <Card className="card-elevated">
-        <CardHeader>
-          <div className="flex items-start justify-between">
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between gap-2">
             <CardTitle className="text-lg">{job.title}</CardTitle>
-            <span className={cn(
-              "text-xs px-2 py-1 rounded-full font-medium",
-              job.status === "completed" ? "bg-success/10 text-success" :
-              job.status === "in_progress" ? "bg-info/10 text-info" :
-              job.status === "cancelled" ? "bg-destructive/10 text-destructive" :
-              "bg-warning/10 text-warning"
-            )}>
+            <span className={cn("text-xs px-2 py-1 rounded-full font-medium whitespace-nowrap", statusColor(job.status))}>
               {statusMap[job.status]}
             </span>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {job.description && <p className="text-sm text-foreground">{job.description}</p>}
-
           <div className="space-y-2 text-sm">
             <div className="flex items-center gap-2 text-muted-foreground">
-              <MapPin className="h-4 w-4" /> {job.address || "No address"}
+              <MapPin className="h-4 w-4 flex-shrink-0" /> <span className="truncate">{job.address || "No address"}</span>
             </div>
             {job.scheduled_date && (
               <div className="flex items-center gap-2 text-muted-foreground">
-                <Calendar className="h-4 w-4" /> {new Date(job.scheduled_date).toLocaleDateString("en-GB")}
+                <Calendar className="h-4 w-4 flex-shrink-0" /> {new Date(job.scheduled_date).toLocaleDateString("en-GB")}
               </div>
             )}
           </div>
 
+          {/* Status transitions (admin only) */}
           {role === "admin" && available.length > 0 && (
             <div className="pt-3 border-t border-border">
               <p className="text-xs text-muted-foreground mb-2">Update Status</p>
               <div className="flex flex-wrap gap-2">
                 {available.map((s) => (
-                  <Button key={s} variant="outline" size="sm" className="text-xs capitalize" onClick={() => updateStatus(s)}>
+                  <Button key={s} variant="outline" size="sm" className="text-xs" onClick={() => updateStatus(s)}>
                     {statusMap[s] || s}
                   </Button>
                 ))}
@@ -107,6 +224,146 @@ export default function JobDetail() {
           )}
         </CardContent>
       </Card>
+
+      {/* Photos Section */}
+      <Card className="card-elevated">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Camera className="h-4 w-4" /> Photos
+              <span className="text-xs font-normal text-muted-foreground">({photos.length})</span>
+            </CardTitle>
+            {(role === "owner" || role === "scaffolder" || role === "admin") && (
+              <label className="cursor-pointer">
+                <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} disabled={uploading} />
+                <Button size="sm" variant="outline" className="text-xs pointer-events-none" asChild>
+                  <span><Upload className="h-3 w-3 mr-1" />{uploading ? "Uploading…" : "Upload"}</span>
+                </Button>
+              </label>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {photos.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">No photos yet</p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {photos.map((photo) => (
+                <div key={photo.id} className="relative group rounded-xl overflow-hidden border border-border">
+                  <img src={photo.url} alt="Site photo" className="w-full h-32 object-cover" />
+                  <div className="absolute top-1.5 right-1.5">
+                    <span className={cn(
+                      "text-[10px] px-1.5 py-0.5 rounded-full font-medium",
+                      photo.review_status === "approved" && "bg-success/90 text-white",
+                      photo.review_status === "rejected" && "bg-destructive/90 text-white",
+                      photo.review_status === "pending" && "bg-warning/90 text-white",
+                    )}>
+                      {photo.review_status}
+                    </span>
+                  </div>
+                  {role === "admin" && photo.review_status === "pending" && (
+                    <div className="absolute bottom-0 inset-x-0 bg-black/60 flex items-center justify-center gap-1 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button size="sm" variant="ghost" className="h-7 text-white hover:text-success hover:bg-transparent text-xs" onClick={() => reviewPhoto(photo.id, "approved")}>
+                        <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-7 text-white hover:text-destructive hover:bg-transparent text-xs" onClick={() => reviewPhoto(photo.id, "rejected")}>
+                        <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Quotes Section */}
+      <Card className="card-elevated">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <FileText className="h-4 w-4" /> Quotes
+              <span className="text-xs font-normal text-muted-foreground">({quotes.length})</span>
+            </CardTitle>
+            {role === "scaffolder" && (
+              <Button size="sm" variant="outline" className="text-xs" onClick={() => setQuoteOpen(true)}>
+                <Send className="h-3 w-3 mr-1" /> Submit Quote
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {quotes.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">No quotes submitted</p>
+          ) : (
+            <div className="space-y-3">
+              {quotes.map((q) => (
+                <div key={q.id} className="p-3 rounded-xl border border-border bg-secondary/30 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-semibold tabular-nums">£{Number(q.amount).toLocaleString()}</span>
+                    </div>
+                    {q.review_decision ? (
+                      <span className={cn(
+                        "text-[10px] px-2 py-0.5 rounded-full font-medium capitalize",
+                        q.review_decision === "accepted" && "bg-success/10 text-success",
+                        q.review_decision === "rejected" && "bg-destructive/10 text-destructive",
+                        q.review_decision === "countered" && "bg-warning/10 text-warning",
+                      )}>
+                        {q.review_decision}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-muted text-muted-foreground">Pending</span>
+                    )}
+                  </div>
+                  {q.notes && <p className="text-xs text-muted-foreground">{q.notes}</p>}
+                  <p className="text-[10px] text-muted-foreground">
+                    {new Date(q.submitted_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                  </p>
+                  {/* Review actions for owner/admin */}
+                  {(role === "owner" || role === "admin") && !q.review_decision && (
+                    <div className="flex gap-2 pt-1">
+                      <Button size="sm" variant="outline" className="text-xs h-7 text-success border-success/30" onClick={() => reviewQuote(q.id, "accepted")}>
+                        Accept
+                      </Button>
+                      <Button size="sm" variant="outline" className="text-xs h-7 text-destructive border-destructive/30" onClick={() => reviewQuote(q.id, "rejected")}>
+                        Reject
+                      </Button>
+                      <Button size="sm" variant="outline" className="text-xs h-7 text-warning border-warning/30" onClick={() => reviewQuote(q.id, "countered")}>
+                        Counter
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Submit Quote Dialog */}
+      <Dialog open={quoteOpen} onOpenChange={setQuoteOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Submit a Quote</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Amount (£)</Label>
+              <Input type="number" placeholder="e.g. 2500" value={quoteAmount} onChange={(e) => setQuoteAmount(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea placeholder="Include details about timeline, materials, etc." value={quoteNotes} onChange={(e) => setQuoteNotes(e.target.value)} rows={3} />
+            </div>
+            <Button className="w-full" disabled={submittingQuote || !quoteAmount} onClick={submitQuote}>
+              {submittingQuote ? "Submitting…" : "Submit Quote"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
