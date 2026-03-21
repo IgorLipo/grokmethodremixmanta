@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { HardHat, MapPin, Briefcase, UserPlus, Plus, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { HardHat, MapPin, Briefcase, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface Scaffolder {
@@ -23,28 +22,23 @@ interface Region {
   code: string;
 }
 
-interface Assignment {
-  scaffolder_id: string;
-  region_id: string | null;
-  job_id: string;
-}
-
 export default function Scaffolders() {
   const { role } = useAuth();
   const { toast } = useToast();
   const [scaffolders, setScaffolders] = useState<Scaffolder[]>([]);
   const [regions, setRegions] = useState<Region[]>([]);
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [scaffolderRegionMap, setScaffolderRegionMap] = useState<Record<string, string[]>>({});
   const [jobCounts, setJobCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [assignOpen, setAssignOpen] = useState<string | null>(null);
   const [selectedRegion, setSelectedRegion] = useState("");
 
   const fetchAll = async () => {
-    const [rolesRes, regionsRes, assignRes] = await Promise.all([
+    const [rolesRes, regionsRes, srRes, assignRes] = await Promise.all([
       supabase.from("user_roles").select("user_id").eq("role", "scaffolder"),
       supabase.from("regions").select("id, name, code").order("name"),
-      supabase.from("job_assignments").select("scaffolder_id, region_id, job_id"),
+      supabase.from("scaffolder_regions").select("scaffolder_id, region_id"),
+      supabase.from("job_assignments").select("scaffolder_id, job_id"),
     ]);
 
     if (rolesRes.data && rolesRes.data.length > 0) {
@@ -52,7 +46,6 @@ export default function Scaffolders() {
       const { data: profiles } = await supabase.from("profiles").select("user_id, first_name, last_name, phone").in("user_id", ids);
       if (profiles) setScaffolders(profiles);
 
-      // Count jobs per scaffolder
       const counts: Record<string, number> = {};
       if (assignRes.data) {
         assignRes.data.forEach((a) => {
@@ -62,30 +55,36 @@ export default function Scaffolders() {
       setJobCounts(counts);
     }
     if (regionsRes.data) setRegions(regionsRes.data);
-    if (assignRes.data) setAssignments(assignRes.data as Assignment[]);
+
+    // Build scaffolder → region[] map
+    const map: Record<string, string[]> = {};
+    if (srRes.data) {
+      srRes.data.forEach((sr: any) => {
+        if (!map[sr.scaffolder_id]) map[sr.scaffolder_id] = [];
+        map[sr.scaffolder_id].push(sr.region_id);
+      });
+    }
+    setScaffolderRegionMap(map);
     setLoading(false);
   };
 
   useEffect(() => { fetchAll(); }, []);
 
   const getScaffolderRegions = (userId: string) => {
-    const regionIds = [...new Set(assignments.filter((a) => a.scaffolder_id === userId && a.region_id).map((a) => a.region_id))];
+    const regionIds = scaffolderRegionMap[userId] || [];
     return regions.filter((r) => regionIds.includes(r.id));
   };
 
   const assignRegion = async (scaffolderId: string) => {
     if (!selectedRegion) return;
-    // Check if already assigned to a job in this region
-    const existing = assignments.find((a) => a.scaffolder_id === scaffolderId && a.region_id === selectedRegion);
+    const existing = (scaffolderRegionMap[scaffolderId] || []).includes(selectedRegion);
     if (existing) {
       toast({ title: "Already assigned to this region", variant: "destructive" });
       return;
     }
-    // Create a dummy assignment to link scaffolder ↔ region
-    const { error } = await supabase.from("job_assignments").insert({
+    const { error } = await supabase.from("scaffolder_regions").insert({
       scaffolder_id: scaffolderId,
       region_id: selectedRegion,
-      job_id: "00000000-0000-0000-0000-000000000000", // placeholder
     });
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -132,7 +131,6 @@ export default function Scaffolders() {
                     </div>
                   </div>
 
-                  {/* Stats */}
                   <div className="flex gap-4 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Briefcase className="h-3.5 w-3.5" /> {jobs} jobs
@@ -142,7 +140,6 @@ export default function Scaffolders() {
                     </span>
                   </div>
 
-                  {/* Region badges */}
                   {sRegions.length > 0 && (
                     <div className="flex flex-wrap gap-1">
                       {sRegions.map((r) => (
@@ -151,7 +148,6 @@ export default function Scaffolders() {
                     </div>
                   )}
 
-                  {/* Admin: assign region */}
                   {role === "admin" && (
                     <Button
                       size="sm"
@@ -169,7 +165,6 @@ export default function Scaffolders() {
         </div>
       )}
 
-      {/* Assign Region Dialog */}
       <Dialog open={!!assignOpen} onOpenChange={() => { setAssignOpen(null); setSelectedRegion(""); }}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>

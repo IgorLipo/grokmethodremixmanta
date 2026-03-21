@@ -36,40 +36,46 @@ export default function Regions() {
   const [submitting, setSubmitting] = useState(false);
 
   const fetchAll = async () => {
-    const [regionsRes, assignRes, rolesRes] = await Promise.all([
+    const [regionsRes, srRes, assignRes] = await Promise.all([
       supabase.from("regions").select("*").order("name"),
-      supabase.from("job_assignments").select("scaffolder_id, region_id, job_id"),
-      supabase.from("user_roles").select("user_id").eq("role", "scaffolder"),
+      supabase.from("scaffolder_regions").select("scaffolder_id, region_id"),
+      supabase.from("job_assignments").select("job_id, region_id"),
     ]);
 
     if (regionsRes.data) setRegions(regionsRes.data);
 
-    // Map scaffolders to regions
-    if (assignRes.data && rolesRes.data) {
-      const scaffolderIds = rolesRes.data.map((r) => r.user_id);
-      const { data: profiles } = await supabase.from("profiles").select("user_id, first_name, last_name").in("user_id", scaffolderIds);
+    // Map scaffolders to regions via scaffolder_regions table
+    if (srRes.data) {
+      const scaffolderIds = [...new Set(srRes.data.map((sr: any) => sr.scaffolder_id))];
+      const { data: profiles } = scaffolderIds.length > 0
+        ? await supabase.from("profiles").select("user_id, first_name, last_name").in("user_id", scaffolderIds)
+        : { data: [] };
 
       const regionScaffolders: Record<string, Scaffolder[]> = {};
-      const regionJobs: Record<string, Set<string>> = {};
+      srRes.data.forEach((sr: any) => {
+        if (!regionScaffolders[sr.region_id]) regionScaffolders[sr.region_id] = [];
+        const profile = profiles?.find((p) => p.user_id === sr.scaffolder_id);
+        if (profile && !regionScaffolders[sr.region_id].find((s) => s.user_id === profile.user_id)) {
+          regionScaffolders[sr.region_id].push(profile);
+        }
+      });
+      setScaffolders(regionScaffolders);
+    }
 
-      assignRes.data.forEach((a) => {
+    // Count jobs per region
+    const regionJobs: Record<string, Set<string>> = {};
+    if (assignRes.data) {
+      assignRes.data.forEach((a: any) => {
         if (a.region_id) {
           if (!regionJobs[a.region_id]) regionJobs[a.region_id] = new Set();
           regionJobs[a.region_id].add(a.job_id);
-
-          if (!regionScaffolders[a.region_id]) regionScaffolders[a.region_id] = [];
-          const profile = profiles?.find((p) => p.user_id === a.scaffolder_id);
-          if (profile && !regionScaffolders[a.region_id].find((s) => s.user_id === profile.user_id)) {
-            regionScaffolders[a.region_id].push(profile);
-          }
         }
       });
-
-      setScaffolders(regionScaffolders);
-      const counts: Record<string, number> = {};
-      Object.entries(regionJobs).forEach(([id, set]) => { counts[id] = set.size; });
-      setJobCounts(counts);
     }
+    const counts: Record<string, number> = {};
+    Object.entries(regionJobs).forEach(([id, set]) => { counts[id] = set.size; });
+    setJobCounts(counts);
+
     setLoading(false);
   };
 
