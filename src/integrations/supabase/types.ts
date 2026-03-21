@@ -51,6 +51,7 @@ export type Database = {
         Row: {
           assigned_at: string
           assigned_by: string | null
+          assignment_role: string
           id: string
           job_id: string
           region_id: string | null
@@ -59,6 +60,7 @@ export type Database = {
         Insert: {
           assigned_at?: string
           assigned_by?: string | null
+          assignment_role?: string
           id?: string
           job_id: string
           region_id?: string | null
@@ -67,6 +69,7 @@ export type Database = {
         Update: {
           assigned_at?: string
           assigned_by?: string | null
+          assignment_role?: string
           id?: string
           job_id?: string
           region_id?: string | null
@@ -402,6 +405,50 @@ export type Database = {
             columns: ["region_id"]
             isOneToOne: false
             referencedRelation: "regions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_reports: {
+        Row: {
+          created_at: string
+          engineer_id: string
+          id: string
+          job_id: string
+          report_data: Json
+          report_photos: Json
+          status: string
+          submitted_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          engineer_id: string
+          id?: string
+          job_id: string
+          report_data?: Json
+          report_photos?: Json
+          status?: string
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          engineer_id?: string
+          id?: string
+          job_id?: string
+          report_data?: Json
+          report_photos?: Json
+          status?: string
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_reports_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
         ]
