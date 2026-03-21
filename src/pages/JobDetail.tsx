@@ -815,6 +815,29 @@ export default function JobDetail() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Fullscreen Photo Viewer */}
+      {fullscreenPhoto && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setFullscreenPhoto(null)}
+        >
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-4 right-4 text-white hover:bg-white/20 z-10"
+            onClick={() => setFullscreenPhoto(null)}
+          >
+            <X className="h-6 w-6" />
+          </Button>
+          <img
+            src={fullscreenPhoto}
+            alt="Full size photo"
+            className="max-w-full max-h-full object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }
