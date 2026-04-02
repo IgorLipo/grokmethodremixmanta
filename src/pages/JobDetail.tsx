@@ -149,6 +149,7 @@ export default function JobDetail() {
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [siteReport, setSiteReport] = useState<any>(null);
+  const [mapsKey, setMapsKey] = useState("");
 
   const fetchAll = useCallback(async () => {
     if (!id) return;
@@ -195,6 +196,27 @@ export default function JobDetail() {
   }, [id, role]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // Fetch maps key for owner static map
+  useEffect(() => {
+    if (role === "owner") {
+      supabase.functions.invoke("get-maps-key").then(({ data }) => {
+        if (data?.key) setMapsKey(data.key);
+      }).catch(() => {});
+    }
+  }, [role]);
+
+  // Realtime: auto-refresh job when status changes (so owner sees updates instantly)
+  useEffect(() => {
+    if (!id) return;
+    const ch = supabase
+      .channel(`job-detail-${id}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "jobs", filter: `id=eq.${id}` }, (payload) => {
+        setJob((prev: any) => prev ? { ...prev, ...payload.new } : payload.new);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [id]);
 
   useEffect(() => {
     const hash = location.hash;
@@ -512,6 +534,15 @@ export default function JobDetail() {
             )}
           </div>
 
+          {/* Owner: static map with saved pin location */}
+          {role === "owner" && mapsKey && job.lat && job.lng && (
+            <img
+              src={`https://maps.googleapis.com/maps/api/staticmap?center=${job.lat},${job.lng}&zoom=18&size=600x200&maptype=satellite&markers=color:red%7C${job.lat},${job.lng}&key=${mapsKey}`}
+              alt="Property location"
+              className="w-full h-40 object-cover rounded-xl border border-border"
+            />
+          )}
+
           {/* Owner: show final price if set */}
           {role === "owner" && (job as any).final_price && (
             <div className="pt-3 border-t border-border">
@@ -764,40 +795,40 @@ export default function JobDetail() {
         </Collapsible>
       )}
 
-      {/* Private Chat Channels */}
-      <Card className="card-elevated">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <MessageSquare className="h-4 w-4" /> Private Messages
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {role === "admin" ? (
-            <Tabs value={chatTab} onValueChange={setChatTab}>
-              <TabsList className="w-full mb-3">
-                <TabsTrigger value="admin_owner" className="flex-1 text-xs">Owner</TabsTrigger>
-                <TabsTrigger value="admin_scaffolder" className="flex-1 text-xs">Scaffolder</TabsTrigger>
-                <TabsTrigger value="admin_engineer" className="flex-1 text-xs">Engineer</TabsTrigger>
-              </TabsList>
-              <TabsContent value="admin_owner">
-                <JobComments jobId={id!} channel="admin_owner" jobTitle={job.title} recipientIds={chatRecipients.admin_owner} />
-              </TabsContent>
-              <TabsContent value="admin_scaffolder">
-                <JobComments jobId={id!} channel="admin_scaffolder" jobTitle={job.title} recipientIds={chatRecipients.admin_scaffolder} />
-              </TabsContent>
-              <TabsContent value="admin_engineer">
-                <JobComments jobId={id!} channel="admin_engineer" jobTitle={job.title} recipientIds={chatRecipients.admin_engineer} />
-              </TabsContent>
-            </Tabs>
-          ) : role === "owner" ? (
-            <JobComments jobId={id!} channel="admin_owner" jobTitle={job.title} recipientIds={chatRecipients.admin_owner} />
-          ) : role === "scaffolder" ? (
-            <JobComments jobId={id!} channel="admin_scaffolder" jobTitle={job.title} recipientIds={chatRecipients.admin_scaffolder} />
-          ) : role === "engineer" ? (
-            <JobComments jobId={id!} channel="admin_engineer" jobTitle={job.title} recipientIds={chatRecipients.admin_engineer} />
-          ) : null}
-        </CardContent>
-      </Card>
+      {/* Private Chat Channels — NOT shown for owner */}
+      {role !== "owner" && (
+        <Card className="card-elevated">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" /> Private Messages
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {role === "admin" ? (
+              <Tabs value={chatTab} onValueChange={setChatTab}>
+                <TabsList className="w-full mb-3">
+                  <TabsTrigger value="admin_owner" className="flex-1 text-xs">Owner</TabsTrigger>
+                  <TabsTrigger value="admin_scaffolder" className="flex-1 text-xs">Scaffolder</TabsTrigger>
+                  <TabsTrigger value="admin_engineer" className="flex-1 text-xs">Engineer</TabsTrigger>
+                </TabsList>
+                <TabsContent value="admin_owner">
+                  <JobComments jobId={id!} channel="admin_owner" jobTitle={job.title} recipientIds={chatRecipients.admin_owner} />
+                </TabsContent>
+                <TabsContent value="admin_scaffolder">
+                  <JobComments jobId={id!} channel="admin_scaffolder" jobTitle={job.title} recipientIds={chatRecipients.admin_scaffolder} />
+                </TabsContent>
+                <TabsContent value="admin_engineer">
+                  <JobComments jobId={id!} channel="admin_engineer" jobTitle={job.title} recipientIds={chatRecipients.admin_engineer} />
+                </TabsContent>
+              </Tabs>
+            ) : role === "scaffolder" ? (
+              <JobComments jobId={id!} channel="admin_scaffolder" jobTitle={job.title} recipientIds={chatRecipients.admin_scaffolder} />
+            ) : role === "engineer" ? (
+              <JobComments jobId={id!} channel="admin_engineer" jobTitle={job.title} recipientIds={chatRecipients.admin_engineer} />
+            ) : null}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Activity Log (Admin only) */}
       {role === "admin" && (
