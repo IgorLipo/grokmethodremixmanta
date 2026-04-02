@@ -178,25 +178,6 @@ export function SchedulingPanel({ job, role, onUpdate }: SchedulingPanelProps) {
           </div>
         )}
 
-        {role === "owner" && job.scheduled_date && !job.schedule_confirmed && job.schedule_response !== "change_requested" && (
-          <div className="space-y-3 pt-2 border-t border-border">
-            <p className="text-xs text-muted-foreground">Confirm this date works for you</p>
-            <Textarea
-              placeholder="Notes (optional — e.g. preferred time, access instructions)"
-              value={responseNotes}
-              onChange={(e) => setResponseNotes(e.target.value)}
-              rows={2}
-            />
-            <div className="flex gap-2">
-              <Button size="sm" className="flex-1 bg-success hover:bg-success/90" onClick={() => respondToSchedule("confirmed")}>
-                <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Confirm
-              </Button>
-              <Button size="sm" variant="outline" className="flex-1 text-warning border-warning/30" onClick={() => respondToSchedule("change_requested")}>
-                Request Change
-              </Button>
-            </div>
-          </div>
-        )}
       </CardContent>
     </Card>
   );
