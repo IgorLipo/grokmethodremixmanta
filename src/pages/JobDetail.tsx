@@ -206,6 +206,18 @@ export default function JobDetail() {
     }
   }, [role]);
 
+  // Realtime: auto-refresh job when status changes (so owner sees updates instantly)
+  useEffect(() => {
+    if (!id) return;
+    const ch = supabase
+      .channel(`job-detail-${id}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "jobs", filter: `id=eq.${id}` }, (payload) => {
+        setJob((prev: any) => prev ? { ...prev, ...payload.new } : payload.new);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [id]);
+
   useEffect(() => {
     const hash = location.hash;
     if (hash === "#photos") setPhotosOpen(true);
