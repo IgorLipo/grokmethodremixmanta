@@ -42,7 +42,7 @@ export default function Jobs() {
   const [form, setForm] = useState({ title: "", description: "", address: "", service_type: "installation" });
   const [submitting, setSubmitting] = useState(false);
   const [editJob, setEditJob] = useState<any>(null);
-  const [editForm, setEditForm] = useState({ title: "", description: "", address: "", status: "" });
+  const [editForm, setEditForm] = useState({ title: "", description: "", address: "", status: "", scheduled_date: undefined as Date | undefined, scheduled_duration: 4 });
   const [editSubmitting, setEditSubmitting] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
