@@ -230,22 +230,58 @@ export default function SiteReport() {
     setSubmitting(false);
   };
 
+  const generatePdfBlob = async (): Promise<Blob> => {
+    // Build a simple HTML report and convert to a printable PDF via iframe
+    let html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Site Report</title>
+    <style>
+      body{font-family:system-ui,sans-serif;padding:24px;color:#1a1a1a;font-size:13px;max-width:700px;margin:0 auto}
+      h1{font-size:20px;margin-bottom:4px}
+      h2{font-size:15px;margin-top:20px;padding-bottom:4px;border-bottom:1px solid #ddd}
+      .field{margin:6px 0}.label{font-weight:600;font-size:12px;color:#555}
+      .value{margin-top:2px}
+      img{max-width:100%;max-height:200px;border-radius:8px;margin-top:4px}
+      .meta{color:#888;font-size:11px;margin-bottom:16px}
+    </style></head><body>`;
+    html += `<h1>Site Report</h1><p class="meta">Job: ${jobId?.slice(0, 8)} • Generated: ${new Date().toLocaleDateString("en-GB")}</p>`;
+    SECTIONS.forEach((section) => {
+      html += `<h2>${section.title}</h2>`;
+      section.fields.forEach((field) => {
+        const val = field.type === "photo" ? reportPhotos[field.key] : reportData[field.key];
+        if (val !== undefined && val !== null && val !== "") {
+          html += `<div class="field"><div class="label">${field.label}</div>`;
+          if (field.type === "photo") {
+            html += `<img src="${val}" alt="${field.label}"/>`;
+          } else if (field.type === "boolean") {
+            html += `<div class="value">${val ? "Yes" : "No"}</div>`;
+          } else {
+            html += `<div class="value">${val}</div>`;
+          }
+          html += `</div>`;
+        }
+      });
+    });
+    html += `</body></html>`;
+    return new Blob([html], { type: "text/html" });
+  };
+
   const shareReport = async () => {
-    const shareData = {
-      title: "Site Report",
-      text: `Site report for job ${jobId?.slice(0, 8)}`,
-      url: window.location.href,
-    };
-    if (navigator.share) {
+    const blob = await generatePdfBlob();
+    const file = new File([blob], `site-report-${jobId?.slice(0, 8)}.html`, { type: "text/html" });
+
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
       try {
-        await navigator.share(shareData);
-      } catch {
-        // User cancelled
-      }
-    } else {
-      await navigator.clipboard.writeText(window.location.href);
-      toast({ title: "Link copied to clipboard" });
+        await navigator.share({ title: "Site Report", files: [file] });
+        return;
+      } catch { /* cancelled */ }
     }
+
+    // Fallback: open in new tab for print/save-as-PDF
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, "_blank");
+    if (win) {
+      win.addEventListener("load", () => { win.print(); });
+    }
+    toast({ title: "Report opened — use Print → Save as PDF" });
   };
 
   const section = SECTIONS[currentSection];

@@ -197,14 +197,12 @@ export default function JobDetail() {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  // Fetch maps key for owner static map
+  // Fetch maps key for static map (all roles)
   useEffect(() => {
-    if (role === "owner") {
-      supabase.functions.invoke("get-maps-key").then(({ data }) => {
-        if (data?.key) setMapsKey(data.key);
-      }).catch(() => {});
-    }
-  }, [role]);
+    supabase.functions.invoke("get-maps-key").then(({ data }) => {
+      if (data?.key) setMapsKey(data.key);
+    }).catch(() => {});
+  }, []);
 
   // Realtime: auto-refresh job when status changes (so owner sees updates instantly)
   useEffect(() => {
@@ -534,13 +532,21 @@ export default function JobDetail() {
             )}
           </div>
 
-          {/* Owner: static map with saved pin location */}
-          {role === "owner" && mapsKey && job.lat && job.lng && (
-            <img
-              src={`https://maps.googleapis.com/maps/api/staticmap?center=${job.lat},${job.lng}&zoom=18&size=600x200&maptype=satellite&markers=color:red%7C${job.lat},${job.lng}&key=${mapsKey}`}
-              alt="Property location"
-              className="w-full h-40 object-cover rounded-xl border border-border"
-            />
+          {/* Static map with saved pin location — all roles */}
+          {mapsKey && job.lat && job.lng && (
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${job.lat},${job.lng}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block"
+            >
+              <img
+                src={`https://maps.googleapis.com/maps/api/staticmap?center=${job.lat},${job.lng}&zoom=18&size=600x200&maptype=satellite&markers=color:red%7C${job.lat},${job.lng}&key=${mapsKey}`}
+                alt="Property location"
+                className="w-full h-40 object-cover rounded-xl border border-border hover:opacity-90 transition-opacity"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1"><MapPin className="h-3 w-3" /> Tap to open in Google Maps</p>
+            </a>
           )}
 
           {/* Owner: show final price if set */}
