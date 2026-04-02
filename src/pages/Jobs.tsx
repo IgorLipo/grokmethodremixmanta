@@ -227,17 +227,37 @@ export default function Jobs() {
               <Input value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} />
             </div>
             {role === "admin" && (
-              <div className="space-y-1.5">
-                <Label className="text-xs">Status</Label>
-                <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(statusMap).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>{v}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Status</Label>
+                  <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(statusMap).map(([k, v]) => (
+                        <SelectItem key={k} value={k}>{v}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Scheduled Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className={cn("w-full justify-start text-left text-sm", !editForm.scheduled_date && "text-muted-foreground")}>
+                        <Calendar className="h-4 w-4 mr-2" />
+                        {editForm.scheduled_date ? format(editForm.scheduled_date, "PPP") : "No date set"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarPicker mode="single" selected={editForm.scheduled_date} onSelect={(d) => setEditForm({ ...editForm, scheduled_date: d })} className="p-3 pointer-events-auto" />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Duration (hours)</Label>
+                  <Input type="number" min={1} max={24} value={editForm.scheduled_duration} onChange={(e) => setEditForm({ ...editForm, scheduled_duration: parseInt(e.target.value) || 4 })} />
+                </div>
+              </>
             )}
             <Button className="w-full" disabled={editSubmitting} onClick={handleEdit}>
               {editSubmitting ? "Saving..." : "Save Changes"}
