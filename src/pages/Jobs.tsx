@@ -7,9 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Briefcase, Pencil } from "lucide-react";
+import { Plus, Search, Briefcase, Pencil, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
+import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { logAudit } from "@/hooks/useAuditLog";
 
@@ -39,7 +42,7 @@ export default function Jobs() {
   const [form, setForm] = useState({ title: "", description: "", address: "", service_type: "installation" });
   const [submitting, setSubmitting] = useState(false);
   const [editJob, setEditJob] = useState<any>(null);
-  const [editForm, setEditForm] = useState({ title: "", description: "", address: "", status: "" });
+  const [editForm, setEditForm] = useState({ title: "", description: "", address: "", status: "", scheduled_date: undefined as Date | undefined, scheduled_duration: 4 });
   const [editSubmitting, setEditSubmitting] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -95,6 +98,10 @@ export default function Jobs() {
     if (role === "admin" && editForm.status !== editJob.status) {
       updates.status = editForm.status;
     }
+    if (role === "admin") {
+      updates.scheduled_date = editForm.scheduled_date ? editForm.scheduled_date.toISOString() : null;
+      updates.scheduled_duration = editForm.scheduled_duration || 4;
+    }
     const { error } = await supabase.from("jobs").update(updates).eq("id", editJob.id);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -109,7 +116,11 @@ export default function Jobs() {
 
   const openEdit = (job: any, e: React.MouseEvent) => {
     e.stopPropagation();
-    setEditForm({ title: job.title, description: job.description || "", address: job.address || "", status: job.status });
+    setEditForm({
+      title: job.title, description: job.description || "", address: job.address || "", status: job.status,
+      scheduled_date: job.scheduled_date ? new Date(job.scheduled_date) : undefined,
+      scheduled_duration: job.scheduled_duration || 4,
+    });
     setEditJob(job);
   };
 
@@ -216,17 +227,37 @@ export default function Jobs() {
               <Input value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} />
             </div>
             {role === "admin" && (
-              <div className="space-y-1.5">
-                <Label className="text-xs">Status</Label>
-                <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(statusMap).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>{v}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Status</Label>
+                  <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(statusMap).map(([k, v]) => (
+                        <SelectItem key={k} value={k}>{v}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Scheduled Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className={cn("w-full justify-start text-left text-sm", !editForm.scheduled_date && "text-muted-foreground")}>
+                        <Calendar className="h-4 w-4 mr-2" />
+                        {editForm.scheduled_date ? format(editForm.scheduled_date, "PPP") : "No date set"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarPicker mode="single" selected={editForm.scheduled_date} onSelect={(d) => setEditForm({ ...editForm, scheduled_date: d })} className="p-3 pointer-events-auto" />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Duration (hours)</Label>
+                  <Input type="number" min={1} max={24} value={editForm.scheduled_duration} onChange={(e) => setEditForm({ ...editForm, scheduled_duration: parseInt(e.target.value) || 4 })} />
+                </div>
+              </>
             )}
             <Button className="w-full" disabled={editSubmitting} onClick={handleEdit}>
               {editSubmitting ? "Saving..." : "Save Changes"}

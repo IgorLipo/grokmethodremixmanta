@@ -527,7 +527,7 @@ export default function JobDetail() {
             <div className="flex items-center gap-2 text-muted-foreground">
               <MapPin className="h-4 w-4 flex-shrink-0" /> <span className="truncate">{job.address || "No address"}</span>
             </div>
-            {job.scheduled_date && (
+            {role !== "owner" && job.scheduled_date && (
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Calendar className="h-4 w-4 flex-shrink-0" /> {new Date(job.scheduled_date).toLocaleDateString("en-GB")}
               </div>
@@ -628,8 +628,8 @@ export default function JobDetail() {
         </CardContent>
       </Card>
 
-      {/* Scheduling Panel */}
-      {showScheduling && <SchedulingPanel job={job} role={role} onUpdate={fetchAll} />}
+      {/* Scheduling Panel — hidden from owner */}
+      {showScheduling && role !== "owner" && <SchedulingPanel job={job} role={role} onUpdate={fetchAll} />}
 
       {/* Guided Photo Upload for Owners — only if photos haven't been submitted yet */}
       {role === "owner" && ["draft"].includes(job.status) && (
@@ -778,12 +778,12 @@ export default function JobDetail() {
                   <div className="mt-4 pt-3 border-t border-border space-y-2">
                     <p className="text-xs text-muted-foreground font-medium">Pending Actions</p>
                     {quotes.filter(q => !q.review_decision).map(q => (
-                      <div key={q.id} className="flex items-center justify-between p-2 rounded-lg bg-secondary/30">
+                      <div key={q.id} className="p-2 rounded-lg bg-secondary/30 space-y-2">
                         <span className="text-sm font-semibold">£{Number(q.amount).toLocaleString()}</span>
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline" className="text-xs h-7 text-success border-success/30" onClick={() => reviewQuote(q.id, "accepted")}>Accept</Button>
-                          <Button size="sm" variant="outline" className="text-xs h-7 text-destructive border-destructive/30" onClick={() => reviewQuote(q.id, "rejected")}>Reject</Button>
-                          <Button size="sm" variant="outline" className="text-xs h-7 text-warning border-warning/30" onClick={() => reviewQuote(q.id, "countered")}>Counter</Button>
+                        <div className="flex flex-wrap gap-2">
+                          <Button size="sm" variant="outline" className="text-xs h-7 flex-1 min-w-[70px] text-success border-success/30" onClick={() => reviewQuote(q.id, "accepted")}>Accept</Button>
+                          <Button size="sm" variant="outline" className="text-xs h-7 flex-1 min-w-[70px] text-destructive border-destructive/30" onClick={() => reviewQuote(q.id, "rejected")}>Reject</Button>
+                          <Button size="sm" variant="outline" className="text-xs h-7 flex-1 min-w-[70px] text-warning border-warning/30" onClick={() => reviewQuote(q.id, "countered")}>Counter</Button>
                         </div>
                       </div>
                     ))}
