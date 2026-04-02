@@ -116,7 +116,11 @@ export default function Jobs() {
 
   const openEdit = (job: any, e: React.MouseEvent) => {
     e.stopPropagation();
-    setEditForm({ title: job.title, description: job.description || "", address: job.address || "", status: job.status });
+    setEditForm({
+      title: job.title, description: job.description || "", address: job.address || "", status: job.status,
+      scheduled_date: job.scheduled_date ? new Date(job.scheduled_date) : undefined,
+      scheduled_duration: job.scheduled_duration || 4,
+    });
     setEditJob(job);
   };
 
