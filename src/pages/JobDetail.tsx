@@ -522,6 +522,15 @@ export default function JobDetail() {
             )}
           </div>
 
+          {/* Owner: static map with saved pin location */}
+          {role === "owner" && mapsKey && job.lat && job.lng && (
+            <img
+              src={`https://maps.googleapis.com/maps/api/staticmap?center=${job.lat},${job.lng}&zoom=18&size=600x200&maptype=satellite&markers=color:red%7C${job.lat},${job.lng}&key=${mapsKey}`}
+              alt="Property location"
+              className="w-full h-40 object-cover rounded-xl border border-border"
+            />
+          )}
+
           {/* Owner: show final price if set */}
           {role === "owner" && (job as any).final_price && (
             <div className="pt-3 border-t border-border">
