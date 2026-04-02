@@ -93,6 +93,8 @@ export function JobComments({ jobId, channel, jobTitle, recipientIds }: JobComme
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
       setMessage("");
+      // Immediately refresh to show own message
+      await fetchComments();
       // Notify recipients
       if (recipientIds) {
         for (const rid of recipientIds) {
