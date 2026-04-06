@@ -239,7 +239,7 @@ export default function SiteReport() {
     container.style.cssText = "position:absolute;left:-9999px;top:0;width:700px;padding:32px;background:#fff;font-family:system-ui,sans-serif;color:#1a1a1a;font-size:13px";
 
     let html = `<h1 style="font-size:20px;margin:0 0 4px">Manta Ray Energy — Site Report</h1>`;
-    html += `<p style="color:#888;font-size:11px;margin-bottom:16px">Job: ${job?.title || jobId?.slice(0, 8)} • ${job?.address || ""} • Generated: ${new Date().toLocaleDateString("en-GB")}</p>`;
+    html += `<p style="color:#888;font-size:11px;margin-bottom:16px">Job: ${jobId?.slice(0, 8)} • Generated: ${new Date().toLocaleDateString("en-GB")}</p>`;
 
     for (const section of SECTIONS) {
       html += `<h2 style="font-size:15px;margin-top:20px;padding-bottom:4px;border-bottom:1px solid #ddd">${section.title}</h2>`;
