@@ -31,7 +31,7 @@ const navItems: NavItem[] = [
   { path: "/jobs", label: "Jobs", icon: Briefcase, roles: ["admin", "scaffolder", "engineer"] },
   { path: "/my-quotes", label: "My Quotes", icon: ScrollText, roles: ["scaffolder"] },
   { path: "/site-reports", label: "Site Reports", icon: ScrollText, roles: ["engineer"] },
-  { path: "/scaffolders", label: "Scaffolders", icon: HardHat, roles: ["admin"] },
+  { path: "/scaffolders", label: "Team", icon: HardHat, roles: ["admin"] },
   { path: "/regions", label: "Regions", icon: MapPin, roles: ["admin"] },
   { path: "/notifications", label: "Notifications", icon: Bell },
   { path: "/audit", label: "Audit Log", icon: ScrollText, roles: ["admin"] },
@@ -67,7 +67,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           {sidebarOpen && (
             <div className="animate-fade-in">
-              <h1 className="text-sm font-semibold">Solar Scaffold Pro</h1>
+              <h1 className="text-sm font-semibold">Manta Ray Energy</h1>
               <p className="text-[10px] text-sidebar-foreground/50 capitalize">{role || "loading"}</p>
             </div>
           )}
@@ -127,7 +127,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <HardHat className="h-4 w-4" />
           </div>
-          <span className="text-sm font-semibold">Solar Scaffold Pro</span>
+          <span className="text-sm font-semibold">Manta Ray Energy</span>
         </div>
         <Button
           variant="ghost"

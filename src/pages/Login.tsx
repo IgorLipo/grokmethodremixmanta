@@ -59,7 +59,7 @@ export default function Login() {
             <HardHat className="h-7 w-7" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-foreground">Solar Scaffold Pro</h1>
+            <h1 className="text-xl font-semibold text-foreground">Manta Ray Energy</h1>
             <p className="text-sm text-muted-foreground mt-1">
               {isLogin ? "Sign in to your account" : "Create a new account"}
             </p>
@@ -107,7 +107,7 @@ export default function Login() {
 
           {isLogin && (
             <div className="pt-3 border-t border-border">
-              <p className="text-xs text-muted-foreground text-center mb-2">Quick demo access</p>
+              <p className="text-xs text-muted-foreground text-center mb-2">Demo access (review only)</p>
               <div className="grid grid-cols-2 gap-2">
                 {["admin", "owner", "scaffolder", "engineer"].map((r) => (
                   <Button key={r} variant="outline" size="sm" className="text-xs capitalize" onClick={() => fillDemo(r)}>

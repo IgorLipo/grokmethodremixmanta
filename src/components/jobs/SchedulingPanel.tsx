@@ -29,8 +29,8 @@ function generateICS(job: any): string {
     "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//SolarScaffoldPro//EN",
     "BEGIN:VEVENT", `DTSTART:${fmt(start)}`, `DTEND:${fmt(end)}`,
     `SUMMARY:${job.title}`, `LOCATION:${job.address}`,
-    `DESCRIPTION:Solar Scaffold Pro job — ${job.description || "No description"}`,
-    `UID:${job.id}@solarscaffoldpro`, "END:VEVENT", "END:VCALENDAR",
+    `DESCRIPTION:Manta Ray Energy job — ${job.description || "No description"}`,
+    `UID:${job.id}@mantarayenergy`, "END:VEVENT", "END:VCALENDAR",
   ].join("\r\n");
 }
 

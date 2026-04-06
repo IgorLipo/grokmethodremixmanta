@@ -20,8 +20,8 @@ export default defineConfig(({ mode }) => ({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico"],
       manifest: {
-        name: "Solar Scaffold Pro",
-        short_name: "SolarOps",
+        name: "Manta Ray Energy",
+        short_name: "MantaRay",
         description: "UK solar installation operations platform",
         theme_color: "#059669",
         background_color: "#0f172a",
