@@ -127,12 +127,24 @@ export default function Login() {
             <div className="pt-3 border-t border-border">
               <p className="text-xs text-muted-foreground text-center mb-2">Demo access (review only)</p>
               <div className="grid grid-cols-2 gap-2">
-                {["admin", "owner", "scaffolder", "engineer"].map((r) => (
+                {["admin", "scaffolder", "engineer"].map((r) => (
                   <Button key={r} variant="outline" size="sm" className="text-xs capitalize" onClick={() => fillDemo(r)}>
                     {r}
                   </Button>
                 ))}
+                <Button variant="outline" size="sm" className="text-xs" onClick={() => fillDemo("owner")}>
+                  Existing Owner
+                </Button>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full mt-2 text-xs border-primary/30 text-primary"
+                disabled={creatingDemo}
+                onClick={handleNewOwnerDemo}
+              >
+                {creatingDemo ? "Creating demo..." : "New Owner Demo →"}
+              </Button>
             </div>
           )}
         </CardContent>
