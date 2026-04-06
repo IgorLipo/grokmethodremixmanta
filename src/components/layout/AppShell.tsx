@@ -127,7 +127,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <HardHat className="h-4 w-4" />
           </div>
-          <span className="text-sm font-semibold">Solar Scaffold Pro</span>
+          <span className="text-sm font-semibold">Manta Ray Energy</span>
         </div>
         <Button
           variant="ghost"
