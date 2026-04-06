@@ -107,7 +107,7 @@ export default function Login() {
 
           {isLogin && (
             <div className="pt-3 border-t border-border">
-              <p className="text-xs text-muted-foreground text-center mb-2">Quick demo access</p>
+              <p className="text-xs text-muted-foreground text-center mb-2">Demo access (review only)</p>
               <div className="grid grid-cols-2 gap-2">
                 {["admin", "owner", "scaffolder", "engineer"].map((r) => (
                   <Button key={r} variant="outline" size="sm" className="text-xs capitalize" onClick={() => fillDemo(r)}>
