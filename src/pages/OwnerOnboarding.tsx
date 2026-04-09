@@ -188,10 +188,86 @@ export default function OwnerOnboarding() {
     }
   };
 
+  const serviceTypeLabels: Record<string, string> = {
+    new_job: "New Job",
+    service: "Service",
+    full_site_replacement: "Full Site Replacement",
+  };
+
+  const generateOnboardingPdf = async () => {
+    const doc = new jsPDF();
+    const pw = doc.internal.pageSize.getWidth();
+    let y = 20;
+    
+    doc.setFillColor(249, 115, 22);
+    doc.rect(0, 0, pw, 35, "F");
+    doc.setTextColor(255);
+    doc.setFontSize(18);
+    doc.text("Manta Ray Energy", 15, 15);
+    doc.setFontSize(12);
+    doc.text("Onboarding Application", 15, 25);
+    
+    y = 45;
+    doc.setTextColor(0);
+    doc.setFontSize(14);
+    doc.text("Job Details", 15, y); y += 10;
+    
+    doc.setFontSize(10);
+    doc.text(`Job Type: ${serviceTypeLabels[serviceType] || serviceType}`, 15, y); y += 7;
+    doc.text(`Address: ${address}`, 15, y); y += 7;
+    doc.text(`Latitude: ${lat.toFixed(6)}`, 15, y); y += 7;
+    doc.text(`Longitude: ${lng.toFixed(6)}`, 15, y); y += 7;
+    doc.text(`Date: ${new Date().toLocaleDateString("en-GB")}`, 15, y); y += 12;
+    
+    // Add map image if available
+    if (mapsKey) {
+      try {
+        const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=18&size=560x200&maptype=satellite&markers=color:red%7C${lat},${lng}&key=${mapsKey}`;
+        const img = await loadImage(mapUrl);
+        doc.addImage(img, "JPEG", 15, y, pw - 30, 50);
+        y += 55;
+      } catch { /* skip map if fails */ }
+    }
+    
+    // Photos
+    if (Object.keys(photos).length > 0) {
+      doc.setFontSize(14);
+      doc.text("Uploaded Photos", 15, y); y += 8;
+      
+      for (const [key, photo] of Object.entries(photos)) {
+        if (y > 240) { doc.addPage(); y = 20; }
+        doc.setFontSize(9);
+        doc.text(key.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()), 15, y); y += 3;
+        try {
+          const img = await loadImage(photo.storageUrl || photo.url);
+          doc.addImage(img, "JPEG", 15, y, 80, 50);
+          y += 55;
+        } catch { y += 5; }
+      }
+    }
+    
+    return doc.output("blob");
+  };
+
+  const loadImage = (url: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        const c = document.createElement("canvas");
+        c.width = img.width; c.height = img.height;
+        c.getContext("2d")!.drawImage(img, 0, 0);
+        resolve(c.toDataURL("image/jpeg"));
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
+  };
+
   const handleSubmit = async () => {
     if (!user) return;
     setSubmitting(true);
-    const title = address.split(",")[0] || "Solar Installation";
+    const title = address.split(",")[0] || "New Job";
 
     const { error: jobError } = await supabase.from("jobs").insert({
       id: jobId,
@@ -201,7 +277,7 @@ export default function OwnerOnboarding() {
       lat,
       lng,
       status: "submitted" as any,
-      service_type: "installation",
+      service_type: serviceType,
     } as any);
     if (jobError) {
       toast({
@@ -222,7 +298,7 @@ export default function OwnerOnboarding() {
       });
     }
 
-    logAudit(user.id, "job_created", "job", jobId, { address });
+    logAudit(user.id, "job_created", "job", jobId, { address, service_type: serviceType });
     notifyOwnerPhotoSubmitted(user.id, title, jobId);
 
     const { data: adminRoles } = await supabase
@@ -230,12 +306,23 @@ export default function OwnerOnboarding() {
       .select("user_id")
       .eq("role", "admin");
     if (adminRoles) {
-      notifyPhotoUploaded(
-        jobId,
-        title,
-        adminRoles.map((r) => r.user_id)
-      );
+      notifyPhotoUploaded(jobId, title, adminRoles.map((r) => r.user_id));
     }
+
+    // Generate and download onboarding PDF
+    try {
+      const pdfBlob = await generateOnboardingPdf();
+      const file = new File([pdfBlob], `onboarding-${jobId.slice(0, 8)}.pdf`, { type: "application/pdf" });
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ title: "Onboarding Application", files: [file] }).catch(() => {});
+      } else {
+        const url = URL.createObjectURL(pdfBlob);
+        const a = document.createElement("a");
+        a.href = url; a.download = file.name;
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a); URL.revokeObjectURL(url);
+      }
+    } catch { /* PDF gen is best-effort */ }
 
     toast({ title: "Application submitted!" });
     setSubmitting(false);
