@@ -536,7 +536,7 @@ export default function OwnerOnboarding() {
         })()}
 
       {/* Review Step */}
-      {step === PHOTO_STEPS.length + 1 && (
+      {step === PHOTO_STEPS.length + 2 && (
         <div className="space-y-4 animate-fade-in">
           <div>
             <h2 className="text-xl font-semibold text-foreground">
@@ -553,6 +553,9 @@ export default function OwnerOnboarding() {
                 <MapPin className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                 <p className="text-sm font-medium text-foreground">{address}</p>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Job Type: {serviceTypeLabels[serviceType] || serviceType}
+              </p>
               {mapsKey && (
                 <img
                   src={`https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=18&size=600x200&maptype=satellite&markers=color:red%7C${lat},${lng}&key=${mapsKey}`}
@@ -602,12 +605,12 @@ export default function OwnerOnboarding() {
           <div />
         )}
 
-        {step < PHOTO_STEPS.length + 1 ? (
+        {step < PHOTO_STEPS.length + 2 ? (
           <div className="flex gap-2">
-            {step > 0 &&
-              step <= PHOTO_STEPS.length &&
-              !PHOTO_STEPS[step - 1].required &&
-              !photos[PHOTO_STEPS[step - 1].id] && (
+            {step > 1 &&
+              step <= PHOTO_STEPS.length + 1 &&
+              !PHOTO_STEPS[step - 2].required &&
+              !photos[PHOTO_STEPS[step - 2].id] && (
                 <Button
                   variant="ghost"
                   size="sm"
