@@ -401,11 +401,42 @@ export default function OwnerOnboarding() {
         </div>
       )}
 
+      {/* Step 1: Job Type */}
+      {step === 1 && (
+        <div className="space-y-4 animate-fade-in">
+          <div>
+            <h2 className="text-xl font-semibold text-foreground">What type of job?</h2>
+            <p className="text-sm text-muted-foreground mt-1">Select the service you need</p>
+          </div>
+          <div className="space-y-2">
+            {[
+              { value: "new_job", label: "New Job", desc: "New solar panel installation" },
+              { value: "service", label: "Service", desc: "Maintenance or repair of existing installation" },
+              { value: "full_site_replacement", label: "Full Site Replacement", desc: "Complete replacement of existing system" },
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setServiceType(opt.value)}
+                className={cn(
+                  "w-full text-left p-4 rounded-xl border-2 transition-colors",
+                  serviceType === opt.value
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-primary/30"
+                )}
+              >
+                <p className="text-sm font-medium text-foreground">{opt.label}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Photo Steps */}
-      {step > 0 &&
-        step <= PHOTO_STEPS.length &&
+      {step > 1 &&
+        step <= PHOTO_STEPS.length + 1 &&
         (() => {
-          const ps = PHOTO_STEPS[step - 1];
+          const ps = PHOTO_STEPS[step - 2];
           const Icon = ps.icon;
           const uploaded = photos[ps.id];
 
