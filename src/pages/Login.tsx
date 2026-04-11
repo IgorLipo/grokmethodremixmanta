@@ -16,6 +16,7 @@ export default function Login() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [signupRole, setSignupRole] = useState("owner");
+  const [businessAddress, setBusinessAddress] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const { signIn, signUp } = useAuth();
@@ -31,7 +32,7 @@ export default function Login() {
         if (error) throw error;
         navigate("/");
       } else {
-        const { error } = await signUp(email, password, firstName, lastName, signupRole);
+        const { error } = await signUp(email, password, firstName, lastName, signupRole, businessAddress);
         if (error) throw error;
         toast({ title: "Account created", description: "You're now signed in." });
         navigate("/");
@@ -42,6 +43,8 @@ export default function Login() {
       setSubmitting(false);
     }
   };
+
+  const showBusinessAddress = !isLogin && (signupRole === "scaffolder" || signupRole === "engineer");
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
@@ -61,12 +64,8 @@ export default function Login() {
           <form onSubmit={handleSubmit} className="space-y-3">
             {!isLogin && (
               <>
-                <div className="grid grid-cols-2 gap-2">
-                  <Input placeholder="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
-                  <Input placeholder="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
-                </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Role</Label>
+                  <Label className="text-xs">I am a</Label>
                   <Select value={signupRole} onValueChange={setSignupRole}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -76,6 +75,17 @@ export default function Login() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input placeholder="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
+                  <Input placeholder="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+                </div>
+                {showBusinessAddress && (
+                  <Input
+                    placeholder="Business address"
+                    value={businessAddress}
+                    onChange={(e) => setBusinessAddress(e.target.value)}
+                  />
+                )}
               </>
             )}
             <Input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />

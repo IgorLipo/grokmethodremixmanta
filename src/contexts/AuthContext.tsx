@@ -11,6 +11,7 @@ interface Profile {
   last_name: string;
   phone: string;
   avatar_url: string;
+  business_address: string;
 }
 
 interface AuthContextType {
@@ -20,8 +21,9 @@ interface AuthContextType {
   role: AppRole | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, firstName: string, lastName: string, role?: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, firstName: string, lastName: string, role?: string, businessAddress?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  refreshRole: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -40,6 +42,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ]);
     if (profileRes.data) setProfile(profileRes.data as Profile);
     if (roleRes.data) setRole(roleRes.data.role as AppRole);
+  };
+
+  const refreshRole = async () => {
+    if (!user) return;
+    const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id).single();
+    if (data) setRole(data.role as AppRole);
   };
 
   useEffect(() => {
@@ -74,20 +82,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error as Error | null };
   };
 
-  const signUp = async (email: string, password: string, firstName: string, lastName: string, role?: string) => {
+  const signUp = async (email: string, password: string, firstName: string, lastName: string, role?: string, businessAddress?: string) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { first_name: firstName, last_name: lastName, signup_role: role || "owner" } },
     });
-    if (!error && data.user && role && role !== "owner") {
-      // Update the default 'owner' role to the selected role via edge function
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        await supabase.functions.invoke("update-signup-role", {
-          body: { user_id: data.user.id, role },
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        });
+    if (!error && data.user) {
+      const selectedRole = role || "owner";
+      if (selectedRole !== "owner") {
+        // Update the default 'owner' role to the selected role via edge function
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await supabase.functions.invoke("update-signup-role", {
+            body: { user_id: data.user.id, role: selectedRole, business_address: businessAddress || "" },
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          });
+          // Update local role immediately so routing works correctly
+          setRole(selectedRole as AppRole);
+        }
       }
     }
     return { error: error as Error | null };
@@ -102,7 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, role, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, session, profile, role, loading, signIn, signUp, signOut, refreshRole }}>
       {children}
     </AuthContext.Provider>
   );
