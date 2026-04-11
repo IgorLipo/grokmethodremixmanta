@@ -14,7 +14,7 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const { user_id, role } = await req.json();
+    const { user_id, role, business_address } = await req.json();
     if (!user_id || !role || !["scaffolder", "engineer"].includes(role)) {
       return new Response(JSON.stringify({ error: "Invalid role" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -27,6 +27,11 @@ Deno.serve(async (req) => {
 
     // Update from default 'owner' to selected role
     await adminClient.from("user_roles").update({ role }).eq("user_id", user_id);
+
+    // Save business address if provided
+    if (business_address) {
+      await adminClient.from("profiles").update({ business_address }).eq("user_id", user_id);
+    }
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
