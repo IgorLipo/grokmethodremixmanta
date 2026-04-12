@@ -361,13 +361,18 @@ export default function JobDetail() {
 
   const assignScaffolder = async () => {
     if (!selectedScaffolder || !id || !user) return;
+    // Delete existing scaffolder assignment if changing
+    const existingScaffolder = assignments.find(a => a.assignment_role !== "engineer");
+    if (existingScaffolder) {
+      await supabase.from("job_assignments").delete().eq("id", existingScaffolder.id);
+    }
     const { error } = await supabase.from("job_assignments").insert({
       job_id: id, scaffolder_id: selectedScaffolder, assigned_by: user.id,
     });
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Scaffolder assigned" });
+      toast({ title: existingScaffolder ? "Scaffolder changed" : "Scaffolder assigned" });
       logAudit(user.id, "scaffolder_assigned", "assignment", id, { scaffolder_id: selectedScaffolder });
       notifyScaffolderAssigned(selectedScaffolder, job.title, id);
       setAssignOpen(false);
@@ -378,13 +383,18 @@ export default function JobDetail() {
 
   const assignEngineer = async () => {
     if (!selectedEngineer || !id || !user) return;
+    // Delete existing engineer assignment if changing
+    const existingEngineer = assignments.find(a => a.assignment_role === "engineer");
+    if (existingEngineer) {
+      await supabase.from("job_assignments").delete().eq("id", existingEngineer.id);
+    }
     const { error } = await supabase.from("job_assignments").insert({
       job_id: id, scaffolder_id: selectedEngineer, assigned_by: user.id, assignment_role: "engineer",
     });
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Engineer assigned" });
+      toast({ title: existingEngineer ? "Engineer changed" : "Engineer assigned" });
       logAudit(user.id, "engineer_assigned", "assignment", id, { engineer_id: selectedEngineer });
       notifyEngineerAssigned(selectedEngineer, job.title, id);
       setAssignEngineerOpen(false);
@@ -474,8 +484,12 @@ export default function JobDetail() {
   const assignedIds = assignments.map((a) => a.scaffolder_id);
   const assignedScaffolderIds = assignments.filter(a => a.assignment_role !== "engineer").map(a => a.scaffolder_id);
   const assignedEngineerIds = assignments.filter(a => a.assignment_role === "engineer").map(a => a.scaffolder_id);
+  const hasScaffolder = assignedScaffolderIds.length > 0;
+  const hasEngineer = assignedEngineerIds.length > 0;
   const unassignedScaffolders = scaffolders.filter((s) => !assignedScaffolderIds.includes(s.user_id));
   const unassignedEngineers = engineers.filter((e) => !assignedEngineerIds.includes(e.user_id));
+  const allScaffolders = scaffolders;
+  const allEngineers = engineers;
   const showScheduling = ["scheduled", "in_progress", "quote_submitted", "negotiating"].includes(job.status) || job.scheduled_date;
   const showSiteReport = ["in_progress", "completed"].includes(job.status);
   const canEdit = role === "admin" || (role === "owner" && job.owner_id === user?.id);
@@ -621,19 +635,15 @@ export default function JobDetail() {
             </div>
           )}
 
-          {/* Admin: Assign Scaffolder & Engineer below map */}
+          {/* Admin: Assign/Change Scaffolder & Engineer below map */}
           {role === "admin" && (
             <div className="pt-3 border-t border-border flex flex-wrap gap-2">
-              {unassignedScaffolders.length > 0 && (
-                <Button size="sm" variant="outline" className="text-xs" onClick={() => setAssignOpen(true)}>
-                  <UserPlus className="h-3 w-3 mr-1" /> Assign Scaffolder
-                </Button>
-              )}
-              {unassignedEngineers.length > 0 && (
-                <Button size="sm" variant="outline" className="text-xs" onClick={() => setAssignEngineerOpen(true)}>
-                  <UserPlus className="h-3 w-3 mr-1" /> Assign Engineer
-                </Button>
-              )}
+              <Button size="sm" variant="outline" className="text-xs" onClick={() => setAssignOpen(true)}>
+                <UserPlus className="h-3 w-3 mr-1" /> {hasScaffolder ? "Change Scaffolder" : "Assign Scaffolder"}
+              </Button>
+              <Button size="sm" variant="outline" className="text-xs" onClick={() => setAssignEngineerOpen(true)}>
+                <UserPlus className="h-3 w-3 mr-1" /> {hasEngineer ? "Change Engineer" : "Assign Engineer"}
+              </Button>
             </div>
           )}
 
