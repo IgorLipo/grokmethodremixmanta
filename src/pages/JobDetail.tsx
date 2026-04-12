@@ -673,11 +673,6 @@ export default function JobDetail() {
                 </div>
               )}
               <div className="flex flex-wrap gap-2">
-                {unassignedScaffolders.length > 0 && (
-                  <Button size="sm" variant="outline" className="text-xs" onClick={() => setAssignOpen(true)}>
-                    <UserPlus className="h-3 w-3 mr-1" /> Assign Scaffolder
-                  </Button>
-                )}
                 {showSiteReport && (
                   <Button size="sm" variant="outline" className="text-xs" onClick={() => navigate(`/jobs/${id}/report`)}>
                     <ClipboardList className="h-3 w-3 mr-1" /> Site Report
