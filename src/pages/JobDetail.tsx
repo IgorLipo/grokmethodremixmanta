@@ -937,7 +937,7 @@ export default function JobDetail() {
               {(role === "owner" || role === "admin") && (
                 <div className="mb-3">
                   <label className="cursor-pointer">
-                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} disabled={uploading} />
+                    <input type="file" accept="image/*,.pdf,application/pdf" className="hidden" onChange={handlePhotoUpload} disabled={uploading} />
                     <Button size="sm" variant="outline" className="text-xs pointer-events-none" asChild>
                       <span><Upload className="h-3 w-3 mr-1" />{uploading ? "Uploading…" : "Upload Photo"}</span>
                     </Button>
@@ -994,7 +994,7 @@ export default function JobDetail() {
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Before Scaffolding</p>
                 {role === "scaffolder" && (
                   <label className="cursor-pointer">
-                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handlePhotoUpload(e, "before")} disabled={uploading} />
+                    <input type="file" accept="image/*,.pdf,application/pdf" className="hidden" onChange={(e) => handlePhotoUpload(e, "before")} disabled={uploading} />
                     <Button size="sm" variant="outline" className="text-xs h-7 pointer-events-none" asChild>
                       <span><Camera className="h-3 w-3 mr-1" /> Upload Before</span>
                     </Button>
@@ -1018,7 +1018,7 @@ export default function JobDetail() {
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">After Scaffolding</p>
                 {role === "scaffolder" && (
                   <label className="cursor-pointer">
-                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handlePhotoUpload(e, "after")} disabled={uploading} />
+                    <input type="file" accept="image/*,.pdf,application/pdf" className="hidden" onChange={(e) => handlePhotoUpload(e, "after")} disabled={uploading} />
                     <Button size="sm" variant="outline" className="text-xs h-7 pointer-events-none" asChild>
                       <span><Camera className="h-3 w-3 mr-1" /> Upload After</span>
                     </Button>
@@ -1056,7 +1056,7 @@ export default function JobDetail() {
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Before Roof Work</p>
                 {role === "engineer" && (
                   <label className="cursor-pointer">
-                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handlePhotoUpload(e, "before")} disabled={uploading} />
+                    <input type="file" accept="image/*,.pdf,application/pdf" className="hidden" onChange={(e) => handlePhotoUpload(e, "before")} disabled={uploading} />
                     <Button size="sm" variant="outline" className="text-xs h-7 pointer-events-none" asChild>
                       <span><Camera className="h-3 w-3 mr-1" /> Upload Before</span>
                     </Button>
@@ -1080,7 +1080,7 @@ export default function JobDetail() {
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">After Roof Work</p>
                 {role === "engineer" && (
                   <label className="cursor-pointer">
-                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handlePhotoUpload(e, "after")} disabled={uploading} />
+                    <input type="file" accept="image/*,.pdf,application/pdf" className="hidden" onChange={(e) => handlePhotoUpload(e, "after")} disabled={uploading} />
                     <Button size="sm" variant="outline" className="text-xs h-7 pointer-events-none" asChild>
                       <span><Camera className="h-3 w-3 mr-1" /> Upload After</span>
                     </Button>
