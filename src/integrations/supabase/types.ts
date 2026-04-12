@@ -311,6 +311,8 @@ export type Database = {
       quotes: {
         Row: {
           amount: number
+          counter_amount: number | null
+          counter_notes: string | null
           id: string
           job_id: string
           notes: string | null
@@ -322,6 +324,8 @@ export type Database = {
         }
         Insert: {
           amount?: number
+          counter_amount?: number | null
+          counter_notes?: string | null
           id?: string
           job_id: string
           notes?: string | null
@@ -335,6 +339,8 @@ export type Database = {
         }
         Update: {
           amount?: number
+          counter_amount?: number | null
+          counter_notes?: string | null
           id?: string
           job_id?: string
           notes?: string | null
