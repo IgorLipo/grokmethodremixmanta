@@ -124,6 +124,7 @@ export default function JobDetail() {
   const [assignments, setAssignments] = useState<any[]>([]);
   const [scaffolders, setScaffolders] = useState<Scaffolder[]>([]);
   const [adminIds, setAdminIds] = useState<string[]>([]);
+  const [engineers, setEngineers] = useState<Scaffolder[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [quoteOpen, setQuoteOpen] = useState(false);
@@ -131,7 +132,9 @@ export default function JobDetail() {
   const [quoteNotes, setQuoteNotes] = useState("");
   const [submittingQuote, setSubmittingQuote] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [assignEngineerOpen, setAssignEngineerOpen] = useState(false);
   const [selectedScaffolder, setSelectedScaffolder] = useState("");
+  const [selectedEngineer, setSelectedEngineer] = useState("");
   const [guidedUploadOpen, setGuidedUploadOpen] = useState(false);
   const [photosOpen, setPhotosOpen] = useState(true);
   const [quotesOpen, setQuotesOpen] = useState(true);
@@ -164,14 +167,22 @@ export default function JobDetail() {
     if (photosRes.data) setPhotos(photosRes.data as Photo[]);
     if (assignRes.data) setAssignments(assignRes.data);
 
-    const [rolesRes, adminRolesRes] = await Promise.all([
+    const [rolesRes, adminRolesRes, engRolesRes] = await Promise.all([
       supabase.from("user_roles").select("user_id").eq("role", "scaffolder"),
       supabase.from("user_roles").select("user_id").eq("role", "admin"),
+      supabase.from("user_roles").select("user_id").eq("role", "engineer"),
     ]);
-    if (rolesRes.data && rolesRes.data.length > 0) {
-      const { data: profs } = await supabase.from("profiles").select("user_id, first_name, last_name").in("user_id", rolesRes.data.map((r) => r.user_id));
+    const allUserIds = [
+      ...(rolesRes.data || []).map(r => r.user_id),
+      ...(engRolesRes.data || []).map(r => r.user_id),
+    ];
+    if (allUserIds.length > 0) {
+      const { data: profs } = await supabase.from("profiles").select("user_id, first_name, last_name").in("user_id", allUserIds);
       if (profs) {
-        setScaffolders(profs);
+        const scaffolderUserIds = new Set((rolesRes.data || []).map(r => r.user_id));
+        const engineerUserIds = new Set((engRolesRes.data || []).map(r => r.user_id));
+        setScaffolders(profs.filter(p => scaffolderUserIds.has(p.user_id)));
+        setEngineers(profs.filter(p => engineerUserIds.has(p.user_id)));
         const map: Record<string, Scaffolder> = {};
         profs.forEach((p) => { map[p.user_id] = p; });
         setProfiles(map);
