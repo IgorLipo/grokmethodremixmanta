@@ -921,7 +921,13 @@ export default function JobDetail() {
                     </Button>
                   </div>
                 )}
-                <QuoteTimeline quotes={quotes} profiles={profiles} showScaffolderName={role === "admin"} />
+                <QuoteTimeline
+                  quotes={quotes}
+                  profiles={profiles}
+                  showScaffolderName={role === "admin"}
+                  isScaffolder={role === "scaffolder"}
+                  onRespondToCounter={handleScaffolderRespondToCounter}
+                />
                 {/* Admin review actions for pending quotes */}
                 {role === "admin" && quotes.filter(q => !q.review_decision).length > 0 && (
                   <div className="mt-4 pt-3 border-t border-border space-y-2">
