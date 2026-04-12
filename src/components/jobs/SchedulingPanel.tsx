@@ -3,10 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Calendar, CheckCircle2, XCircle, CalendarDays, Clock } from "lucide-react";
+import { Calendar, CheckCircle2, XCircle, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { logAudit } from "@/hooks/useAuditLog";
@@ -26,7 +24,7 @@ export function SchedulingPanel({ job, role, onUpdate }: SchedulingPanelProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [date, setDate] = useState<Date | undefined>(job.scheduled_date ? new Date(job.scheduled_date) : undefined);
-  const [duration, setDuration] = useState(job.scheduled_duration || 4);
+  
   const [saving, setSaving] = useState(false);
   const [responseNotes, setResponseNotes] = useState("");
 
@@ -35,7 +33,7 @@ export function SchedulingPanel({ job, role, onUpdate }: SchedulingPanelProps) {
     setSaving(true);
     const { error } = await supabase.from("jobs").update({
       scheduled_date: date.toISOString(),
-      scheduled_duration: duration,
+      
       schedule_confirmed: false,
       schedule_response: null,
       updated_at: new Date().toISOString(),
@@ -44,7 +42,7 @@ export function SchedulingPanel({ job, role, onUpdate }: SchedulingPanelProps) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
       toast({ title: "Schedule set" });
-      logAudit(user.id, "schedule_set", "job", job.id, { date: date.toISOString(), duration });
+      logAudit(user.id, "schedule_set", "job", job.id, { date: date.toISOString() });
       // Notify assigned scaffolders (not owner — owner is only notified after all parties confirm)
       const { data: assigns } = await (supabase as any).from("job_assignments").select("scaffolder_id").eq("job_id", job.id).eq("assignment_role", "scaffolder");
       if (assigns) {
@@ -104,14 +102,9 @@ export function SchedulingPanel({ job, role, onUpdate }: SchedulingPanelProps) {
       <CardContent className="space-y-4">
         {job.scheduled_date && (
           <div className="bg-secondary/50 rounded-xl p-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm">
-                <Calendar className="h-4 w-4 text-primary" />
-                <span className="font-medium">{format(new Date(job.scheduled_date), "EEE, dd MMM yyyy")}</span>
-              </div>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Clock className="h-3.5 w-3.5" /> {job.scheduled_duration || 4}h
-              </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Calendar className="h-4 w-4 text-primary" />
+              <span className="font-medium">{format(new Date(job.scheduled_date), "EEE, dd MMM yyyy")}</span>
             </div>
             {job.schedule_response === "confirmed" ? (
               <div className="flex items-center gap-1.5 text-xs text-success">
@@ -142,10 +135,6 @@ export function SchedulingPanel({ job, role, onUpdate }: SchedulingPanelProps) {
                 <CalendarPicker mode="single" selected={date} onSelect={setDate} className="p-3 pointer-events-auto" />
               </PopoverContent>
             </Popover>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Duration (hours)</Label>
-              <Input type="number" min={1} max={24} value={duration} onChange={(e) => setDuration(parseInt(e.target.value) || 4)} />
-            </div>
             <Button size="sm" className="w-full" onClick={saveSchedule} disabled={!date || saving}>
               {saving ? "Saving..." : "Set Schedule"}
             </Button>
