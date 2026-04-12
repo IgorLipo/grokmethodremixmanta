@@ -1011,58 +1011,6 @@ export default function JobDetail() {
         </Card>
       )}
 
-      {/* Quotes — Admin and Scaffolder see timeline */}
-      {(role === "admin" || role === "scaffolder") && (
-        <Collapsible open={quotesOpen} onOpenChange={setQuotesOpen}>
-          <Card className="card-elevated">
-            <CollapsibleTrigger asChild>
-              <CardHeader className="pb-3 cursor-pointer hover:bg-secondary/30 transition-colors rounded-t-xl">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <FileText className="h-4 w-4" /> Quote History <span className="text-xs font-normal text-muted-foreground">({quotes.length})</span>
-                  </CardTitle>
-                  <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", quotesOpen && "rotate-180")} />
-                </div>
-              </CardHeader>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <CardContent>
-                {role === "scaffolder" && (
-                  <div className="mb-3">
-                    <Button size="sm" variant="outline" className="text-xs" onClick={() => setQuoteOpen(true)}>
-                      <Send className="h-3 w-3 mr-1" /> Submit Quote
-                    </Button>
-                  </div>
-                )}
-                <QuoteTimeline
-                  quotes={quotes}
-                  profiles={profiles}
-                  showScaffolderName={role === "admin"}
-                  isScaffolder={role === "scaffolder"}
-                  onRespondToCounter={handleScaffolderRespondToCounter}
-                />
-                {/* Admin review actions for pending quotes */}
-                {role === "admin" && quotes.filter(q => !q.review_decision).length > 0 && (
-                  <div className="mt-4 pt-3 border-t border-border space-y-2">
-                    <p className="text-xs text-muted-foreground font-medium">Pending Actions</p>
-                    {quotes.filter(q => !q.review_decision).map(q => (
-                      <div key={q.id} className="p-2 rounded-lg bg-secondary/30 space-y-2">
-                        <span className="text-sm font-semibold">£{Number(q.amount).toLocaleString()}</span>
-                        <div className="flex flex-wrap gap-2">
-                          <Button size="sm" variant="outline" className="text-xs h-7 flex-1 min-w-[70px] text-success border-success/30" onClick={() => reviewQuote(q.id, "accepted")}>Accept</Button>
-                          <Button size="sm" variant="outline" className="text-xs h-7 flex-1 min-w-[70px] text-destructive border-destructive/30" onClick={() => reviewQuote(q.id, "rejected")}>Reject</Button>
-                          <Button size="sm" variant="outline" className="text-xs h-7 flex-1 min-w-[70px] text-warning border-warning/30" onClick={() => reviewQuote(q.id, "countered")}>Counter</Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </CollapsibleContent>
-          </Card>
-        </Collapsible>
-      )}
-
       {/* Private Chat Channels — Admin↔Scaffolder and Admin↔Engineer only */}
       {role !== "owner" && (
         <Card className="card-elevated">
