@@ -594,20 +594,28 @@ export default function JobDetail() {
     admin_engineer: [...adminIds],
   };
 
-  // Separate photos by uploader role
+   // Separate photos by uploader role AND category
   const engineerAssignments = assignments.filter(a => a.assignment_role === "engineer");
   const engineerIds = new Set(engineerAssignments.map(a => a.scaffolder_id));
   const scaffolderAssignments = assignments.filter(a => a.assignment_role === "scaffolder" || !a.assignment_role || a.assignment_role === "scaffolder");
   const scaffolderIds = new Set(scaffolderAssignments.map(a => a.scaffolder_id));
   
   const ownerPhotos = photos.filter(p => !engineerIds.has(p.uploader_id || "") && !scaffolderIds.has(p.uploader_id || ""));
-  const scaffolderPhotos = photos.filter(p => scaffolderIds.has(p.uploader_id || ""));
-  const engineerPhotos = photos.filter(p => engineerIds.has(p.uploader_id || ""));
+  const scaffolderBeforePhotos = photos.filter(p => scaffolderIds.has(p.uploader_id || "") && (p as any).photo_category === "before");
+  const scaffolderAfterPhotos = photos.filter(p => scaffolderIds.has(p.uploader_id || "") && (p as any).photo_category === "after");
+  const engineerBeforePhotos = photos.filter(p => engineerIds.has(p.uploader_id || "") && (p as any).photo_category === "before");
+  const engineerAfterPhotos = photos.filter(p => engineerIds.has(p.uploader_id || "") && (p as any).photo_category === "after");
 
-  // Engineer status actions
-  const engineerActions = role === "engineer" && job.status === "in_progress"
-    ? [{ label: "Mark as Finished", status: "completed" }]
-    : [];
+  // Engineer status actions — show Start Working when scheduled, Mark as Finished when in_progress with submitted report
+  const engineerActions: { label: string; status: string }[] = [];
+  if (role === "engineer") {
+    if (job.status === "scheduled") {
+      engineerActions.push({ label: "Start Working", status: "in_progress" });
+    }
+    if (job.status === "in_progress" && siteReport?.status === "submitted") {
+      engineerActions.push({ label: "Mark as Finished", status: "completed" });
+    }
+  }
 
   const ownerStatus = ownerStatusInfo[job.status];
 
