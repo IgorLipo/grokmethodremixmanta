@@ -313,7 +313,9 @@ export default function JobDetail() {
     logAudit(user.id, "photo_upload", "photo", id);
     notifyPhotoUploaded(id, job.title, adminIds);
     setUploading(false);
-    fetchAll();
+    // Re-fetch photos only, preserve current job state
+    const { data: freshPhotos } = await supabase.from("photos").select("*").eq("job_id", id).order("created_at", { ascending: false });
+    if (freshPhotos) setPhotos(freshPhotos as Photo[]);
   };
 
   const reviewPhoto = async (photoId: string, action: string, comment?: string) => {
