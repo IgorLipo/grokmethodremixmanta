@@ -100,7 +100,7 @@ const ownerStatusInfo: Record<string, { title: string; message: string }> = {
 interface Quote {
   id: string; amount: number; notes: string; submitted_at: string;
   review_decision: string | null; scaffolder_id: string; reviewed_by: string | null;
-  reviewed_at: string | null;
+  reviewed_at: string | null; counter_amount: number | null; counter_notes: string | null;
 }
 interface Photo {
   id: string; url: string; review_status: string; created_at: string; uploader_id: string | null;
@@ -124,6 +124,7 @@ export default function JobDetail() {
   const [assignments, setAssignments] = useState<any[]>([]);
   const [scaffolders, setScaffolders] = useState<Scaffolder[]>([]);
   const [adminIds, setAdminIds] = useState<string[]>([]);
+  const [engineers, setEngineers] = useState<Scaffolder[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [quoteOpen, setQuoteOpen] = useState(false);
@@ -131,7 +132,9 @@ export default function JobDetail() {
   const [quoteNotes, setQuoteNotes] = useState("");
   const [submittingQuote, setSubmittingQuote] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [assignEngineerOpen, setAssignEngineerOpen] = useState(false);
   const [selectedScaffolder, setSelectedScaffolder] = useState("");
+  const [selectedEngineer, setSelectedEngineer] = useState("");
   const [guidedUploadOpen, setGuidedUploadOpen] = useState(false);
   const [photosOpen, setPhotosOpen] = useState(true);
   const [quotesOpen, setQuotesOpen] = useState(true);
@@ -164,14 +167,22 @@ export default function JobDetail() {
     if (photosRes.data) setPhotos(photosRes.data as Photo[]);
     if (assignRes.data) setAssignments(assignRes.data);
 
-    const [rolesRes, adminRolesRes] = await Promise.all([
+    const [rolesRes, adminRolesRes, engRolesRes] = await Promise.all([
       supabase.from("user_roles").select("user_id").eq("role", "scaffolder"),
       supabase.from("user_roles").select("user_id").eq("role", "admin"),
+      supabase.from("user_roles").select("user_id").eq("role", "engineer"),
     ]);
-    if (rolesRes.data && rolesRes.data.length > 0) {
-      const { data: profs } = await supabase.from("profiles").select("user_id, first_name, last_name").in("user_id", rolesRes.data.map((r) => r.user_id));
+    const allUserIds = [
+      ...(rolesRes.data || []).map(r => r.user_id),
+      ...(engRolesRes.data || []).map(r => r.user_id),
+    ];
+    if (allUserIds.length > 0) {
+      const { data: profs } = await supabase.from("profiles").select("user_id, first_name, last_name").in("user_id", allUserIds);
       if (profs) {
-        setScaffolders(profs);
+        const scaffolderUserIds = new Set((rolesRes.data || []).map(r => r.user_id));
+        const engineerUserIds = new Set((engRolesRes.data || []).map(r => r.user_id));
+        setScaffolders(profs.filter(p => scaffolderUserIds.has(p.user_id)));
+        setEngineers(profs.filter(p => engineerUserIds.has(p.user_id)));
         const map: Record<string, Scaffolder> = {};
         profs.forEach((p) => { map[p.user_id] = p; });
         setProfiles(map);
@@ -356,7 +367,8 @@ export default function JobDetail() {
     if (isNaN(amount)) return;
     await supabase.from("quotes").update({
       review_decision: "countered", reviewed_by: user.id, reviewed_at: new Date().toISOString(),
-    }).eq("id", counterOpen);
+      counter_amount: amount, counter_notes: counterNotes || null,
+    } as any).eq("id", counterOpen);
     logAudit(user.id, "quote_countered", "quote", counterOpen, { counter_amount: amount, notes: counterNotes });
     const quote = quotes.find((q) => q.id === counterOpen);
     if (quote) notifyQuoteDecision(quote.scaffolder_id, job.title, `countered at £${amount.toLocaleString()}`, id!);
@@ -382,6 +394,46 @@ export default function JobDetail() {
       setSelectedScaffolder("");
       fetchAll();
     }
+  };
+
+  const assignEngineer = async () => {
+    if (!selectedEngineer || !id || !user) return;
+    const { error } = await supabase.from("job_assignments").insert({
+      job_id: id, scaffolder_id: selectedEngineer, assigned_by: user.id, assignment_role: "engineer",
+    });
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Engineer assigned" });
+      logAudit(user.id, "engineer_assigned", "assignment", id, { engineer_id: selectedEngineer });
+      notifyEngineerAssigned(selectedEngineer, job.title, id);
+      setAssignEngineerOpen(false);
+      setSelectedEngineer("");
+      fetchAll();
+    }
+  };
+
+  const handleScaffolderRespondToCounter = async (quoteId: string, response: "accepted" | "rejected", newAmount?: number, newNotes?: string) => {
+    if (!user || !id) return;
+    if (response === "accepted") {
+      // Scaffolder accepts the counter — mark the quote as accepted
+      await supabase.from("quotes").update({
+        review_decision: "accepted", reviewed_at: new Date().toISOString(),
+      } as any).eq("id", quoteId);
+      toast({ title: "Counter offer accepted" });
+      logAudit(user.id, "counter_accepted", "quote", quoteId);
+      notifyQuoteSubmitted(id, job.title, 0); // notify admin
+    } else {
+      // Scaffolder declines — submit a new quote with updated amount
+      const amount = newAmount || 0;
+      await supabase.from("quotes").insert({
+        job_id: id, scaffolder_id: user.id, amount, notes: newNotes || "Counter declined — revised offer",
+      });
+      toast({ title: "Revised quote submitted" });
+      logAudit(user.id, "counter_declined_new_quote", "quote", quoteId, { new_amount: amount });
+      notifyQuoteSubmitted(id, job.title, amount);
+    }
+    fetchAll();
   };
 
   const handleEditJob = async () => {
@@ -440,7 +492,10 @@ export default function JobDetail() {
 
   const available = transitions[job.status] || [];
   const assignedIds = assignments.map((a) => a.scaffolder_id);
-  const unassignedScaffolders = scaffolders.filter((s) => !assignedIds.includes(s.user_id));
+  const assignedScaffolderIds = assignments.filter(a => a.assignment_role !== "engineer").map(a => a.scaffolder_id);
+  const assignedEngineerIds = assignments.filter(a => a.assignment_role === "engineer").map(a => a.scaffolder_id);
+  const unassignedScaffolders = scaffolders.filter((s) => !assignedScaffolderIds.includes(s.user_id));
+  const unassignedEngineers = engineers.filter((e) => !assignedEngineerIds.includes(e.user_id));
   const showScheduling = ["scheduled", "in_progress", "quote_submitted", "negotiating"].includes(job.status) || job.scheduled_date;
   const showSiteReport = ["in_progress", "completed"].includes(job.status);
   const canEdit = role === "admin" || (role === "owner" && job.owner_id === user?.id);
@@ -562,22 +617,43 @@ export default function JobDetail() {
             </div>
           )}
 
-          {/* Assigned scaffolders */}
+          {/* Assigned team */}
           {assignments.length > 0 && role !== "owner" && (
-            <div className="pt-3 border-t border-border">
-              <p className="text-xs text-muted-foreground mb-2">Assigned</p>
-              <div className="flex flex-wrap gap-1">
-                {assignments.map((a) => {
-                  const s = scaffolders.find((sc) => sc.user_id === a.scaffolder_id);
-                  return (
-                    <Badge key={a.id} variant="secondary" className="text-xs">
-                      <HardHat className="h-3 w-3 mr-1" />
-                      {s ? `${s.first_name} ${s.last_name}` : "Unknown"}
-                      {a.assignment_role === "engineer" && " (Engineer)"}
-                    </Badge>
-                  );
-                })}
-              </div>
+            <div className="pt-3 border-t border-border space-y-1.5">
+              {assignments.filter(a => a.assignment_role !== "engineer").map((a) => {
+                const p = profiles[a.scaffolder_id];
+                return (
+                  <div key={a.id} className="flex items-center gap-2 text-sm">
+                    <HardHat className="h-4 w-4 text-primary" />
+                    <span className="font-medium text-foreground">Scaffolder — {p ? `${p.first_name} ${p.last_name}` : "Unassigned"}</span>
+                  </div>
+                );
+              })}
+              {assignments.filter(a => a.assignment_role === "engineer").map((a) => {
+                const p = profiles[a.scaffolder_id];
+                return (
+                  <div key={a.id} className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-primary" />
+                    <span className="font-medium text-foreground">Engineer — {p ? `${p.first_name} ${p.last_name}` : "Unassigned"}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Admin: Assign Scaffolder & Engineer below map */}
+          {role === "admin" && (
+            <div className="pt-3 border-t border-border flex flex-wrap gap-2">
+              {unassignedScaffolders.length > 0 && (
+                <Button size="sm" variant="outline" className="text-xs" onClick={() => setAssignOpen(true)}>
+                  <UserPlus className="h-3 w-3 mr-1" /> Assign Scaffolder
+                </Button>
+              )}
+              {unassignedEngineers.length > 0 && (
+                <Button size="sm" variant="outline" className="text-xs" onClick={() => setAssignEngineerOpen(true)}>
+                  <UserPlus className="h-3 w-3 mr-1" /> Assign Engineer
+                </Button>
+              )}
             </div>
           )}
 
@@ -597,11 +673,6 @@ export default function JobDetail() {
                 </div>
               )}
               <div className="flex flex-wrap gap-2">
-                {unassignedScaffolders.length > 0 && (
-                  <Button size="sm" variant="outline" className="text-xs" onClick={() => setAssignOpen(true)}>
-                    <UserPlus className="h-3 w-3 mr-1" /> Assign Scaffolder
-                  </Button>
-                )}
                 {showSiteReport && (
                   <Button size="sm" variant="outline" className="text-xs" onClick={() => navigate(`/jobs/${id}/report`)}>
                     <ClipboardList className="h-3 w-3 mr-1" /> Site Report
@@ -850,7 +921,13 @@ export default function JobDetail() {
                     </Button>
                   </div>
                 )}
-                <QuoteTimeline quotes={quotes} profiles={profiles} showScaffolderName={role === "admin"} />
+                <QuoteTimeline
+                  quotes={quotes}
+                  profiles={profiles}
+                  showScaffolderName={role === "admin"}
+                  isScaffolder={role === "scaffolder"}
+                  onRespondToCounter={handleScaffolderRespondToCounter}
+                />
                 {/* Admin review actions for pending quotes */}
                 {role === "admin" && quotes.filter(q => !q.review_decision).length > 0 && (
                   <div className="mt-4 pt-3 border-t border-border space-y-2">
@@ -1001,6 +1078,26 @@ export default function JobDetail() {
               </SelectContent>
             </Select>
             <Button className="w-full" disabled={!selectedScaffolder} onClick={assignScaffolder}>
+              Assign
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign Engineer Dialog */}
+      <Dialog open={assignEngineerOpen} onOpenChange={setAssignEngineerOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Assign Engineer</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <Select value={selectedEngineer} onValueChange={setSelectedEngineer}>
+              <SelectTrigger><SelectValue placeholder="Select engineer" /></SelectTrigger>
+              <SelectContent>
+                {unassignedEngineers.map((e) => (
+                  <SelectItem key={e.user_id} value={e.user_id}>{e.first_name} {e.last_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button className="w-full" disabled={!selectedEngineer} onClick={assignEngineer}>
               Assign
             </Button>
           </div>
