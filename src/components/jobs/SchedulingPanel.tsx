@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Calendar, Download, CheckCircle2, XCircle, CalendarDays, Clock } from "lucide-react";
+import { Calendar, CheckCircle2, XCircle, CalendarDays, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { logAudit } from "@/hooks/useAuditLog";
@@ -21,18 +21,6 @@ interface SchedulingPanelProps {
   onUpdate: () => void;
 }
 
-function generateICS(job: any): string {
-  const start = new Date(job.scheduled_date);
-  const end = new Date(start.getTime() + (job.scheduled_duration || 4) * 3600000);
-  const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-  return [
-    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//SolarScaffoldPro//EN",
-    "BEGIN:VEVENT", `DTSTART:${fmt(start)}`, `DTEND:${fmt(end)}`,
-    `SUMMARY:${job.title}`, `LOCATION:${job.address}`,
-    `DESCRIPTION:Manta Ray Energy job — ${job.description || "No description"}`,
-    `UID:${job.id}@mantarayenergy`, "END:VEVENT", "END:VCALENDAR",
-  ].join("\r\n");
-}
 
 export function SchedulingPanel({ job, role, onUpdate }: SchedulingPanelProps) {
   const { user } = useAuth();
@@ -105,17 +93,6 @@ export function SchedulingPanel({ job, role, onUpdate }: SchedulingPanelProps) {
     onUpdate();
   };
 
-  const downloadICS = () => {
-    if (!job.scheduled_date) return;
-    const ics = generateICS(job);
-    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${job.title.replace(/\s+/g, "_")}.ics`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
 
   return (
     <Card className="card-elevated">
@@ -148,9 +125,6 @@ export function SchedulingPanel({ job, role, onUpdate }: SchedulingPanelProps) {
             ) : (
               <div className="text-xs text-muted-foreground">Awaiting owner confirmation</div>
             )}
-            <Button size="sm" variant="outline" className="w-full text-xs" onClick={downloadICS}>
-              <Download className="h-3 w-3 mr-1" /> Download Calendar (.ics)
-            </Button>
           </div>
         )}
 

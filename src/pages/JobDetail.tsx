@@ -233,23 +233,7 @@ export default function JobDetail() {
     if (hash === "#quotes") setQuotesOpen(true);
   }, [location.hash]);
 
-  const ensureEngineersAssigned = async () => {
-    if (!id || role !== "admin" || !user?.id) return;
-    const { data: engRoles } = await supabase.from("user_roles").select("user_id").eq("role", "engineer");
-    if (!engRoles?.length) return;
-    const { data: existing } = await (supabase as any).from("job_assignments").select("scaffolder_id").eq("job_id", id).eq("assignment_role", "engineer");
-    const existingIds = new Set((existing || []).map((a: any) => a.scaffolder_id));
-    const toInsert = engRoles.filter((e) => !existingIds.has(e.user_id)).map((e) => ({
-      job_id: id, scaffolder_id: e.user_id, assigned_by: user.id, assignment_role: "engineer",
-    }));
-    if (toInsert.length === 0) return;
-    const { error } = await (supabase as any).from("job_assignments").insert(toInsert);
-    if (error) return;
-    for (const a of toInsert) {
-      notifyEngineerAssigned(a.scaffolder_id, job.title, id);
-      logAudit(user.id, "engineer_assigned", "assignment", id, { engineer_id: a.scaffolder_id });
-    }
-  };
+  // Removed: ensureEngineersAssigned — engineers are now assigned manually by admin only
 
   const updateStatus = async (newStatus: string) => {
     const oldStatus = job.status;
@@ -271,9 +255,7 @@ export default function JobDetail() {
       logAudit(user?.id, "status_change", "job", id, { from: oldStatus, to: newStatus });
       const assignedIds = assignments.map((a) => a.scaffolder_id);
       notifyStatusChange(id!, job.title, newStatus, job.owner_id, assignedIds);
-      if (role === "admin" && ["photo_review", "quote_pending"].includes(newStatus)) {
-        await ensureEngineersAssigned();
-      }
+      // Engineers are assigned manually by admin only
     }
   };
 
@@ -322,9 +304,7 @@ export default function JobDetail() {
 
     toast({ title: action === "approved" ? "Photo approved" : "Feedback sent to owner" });
     logAudit(user?.id, `photo_${action}`, "photo", photoId, comment ? { comment } : undefined);
-    if (action === "approved" && role === "admin") {
-      await ensureEngineersAssigned();
-    }
+      // Engineers are assigned manually by admin only
     fetchAll();
   };
 
@@ -381,13 +361,18 @@ export default function JobDetail() {
 
   const assignScaffolder = async () => {
     if (!selectedScaffolder || !id || !user) return;
+    // Delete existing scaffolder assignment if changing
+    const existingScaffolder = assignments.find(a => a.assignment_role !== "engineer");
+    if (existingScaffolder) {
+      await supabase.from("job_assignments").delete().eq("id", existingScaffolder.id);
+    }
     const { error } = await supabase.from("job_assignments").insert({
       job_id: id, scaffolder_id: selectedScaffolder, assigned_by: user.id,
     });
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Scaffolder assigned" });
+      toast({ title: existingScaffolder ? "Scaffolder changed" : "Scaffolder assigned" });
       logAudit(user.id, "scaffolder_assigned", "assignment", id, { scaffolder_id: selectedScaffolder });
       notifyScaffolderAssigned(selectedScaffolder, job.title, id);
       setAssignOpen(false);
@@ -398,13 +383,18 @@ export default function JobDetail() {
 
   const assignEngineer = async () => {
     if (!selectedEngineer || !id || !user) return;
+    // Delete existing engineer assignment if changing
+    const existingEngineer = assignments.find(a => a.assignment_role === "engineer");
+    if (existingEngineer) {
+      await supabase.from("job_assignments").delete().eq("id", existingEngineer.id);
+    }
     const { error } = await supabase.from("job_assignments").insert({
       job_id: id, scaffolder_id: selectedEngineer, assigned_by: user.id, assignment_role: "engineer",
     });
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Engineer assigned" });
+      toast({ title: existingEngineer ? "Engineer changed" : "Engineer assigned" });
       logAudit(user.id, "engineer_assigned", "assignment", id, { engineer_id: selectedEngineer });
       notifyEngineerAssigned(selectedEngineer, job.title, id);
       setAssignEngineerOpen(false);
@@ -473,6 +463,75 @@ export default function JobDetail() {
     }
   };
 
+  const handleDownloadOwnerPdf = async () => {
+    const { default: jsPDF } = await import("jspdf");
+    const doc = new jsPDF();
+    const pw = doc.internal.pageSize.getWidth();
+    let y = 20;
+
+    doc.setFillColor(249, 115, 22);
+    doc.rect(0, 0, pw, 35, "F");
+    doc.setTextColor(255);
+    doc.setFontSize(18);
+    doc.text("Manta Ray Energy", 15, 15);
+    doc.setFontSize(12);
+    doc.text("System Owner Application", 15, 25);
+
+    y = 45;
+    doc.setTextColor(0);
+    doc.setFontSize(14);
+    doc.text("Job Details", 15, y); y += 10;
+    doc.setFontSize(10);
+    const serviceLabels: Record<string, string> = { new_job: "New Job", service: "Service", full_site_replacement: "Full Site Replacement" };
+    doc.text(`Job Type: ${serviceLabels[(job as any).service_type] || (job as any).service_type || "N/A"}`, 15, y); y += 7;
+    doc.text(`Title: ${job.title}`, 15, y); y += 7;
+    doc.text(`Address: ${job.address}`, 15, y); y += 7;
+    if (job.lat && job.lng) {
+      doc.text(`Coordinates: ${job.lat.toFixed(6)}, ${job.lng.toFixed(6)}`, 15, y); y += 7;
+    }
+    doc.text(`Created: ${new Date(job.created_at).toLocaleDateString("en-GB")}`, 15, y); y += 7;
+    doc.text(`Status: ${statusMap[job.status] || job.status}`, 15, y); y += 12;
+
+    // Add photos
+    const jobPhotos = photos.filter(p => !new Set(assignments.filter(a => a.assignment_role === "engineer").map((a: any) => a.scaffolder_id)).has(p.uploader_id || "") && !new Set(assignments.filter(a => a.assignment_role !== "engineer").map((a: any) => a.scaffolder_id)).has(p.uploader_id || ""));
+    if (jobPhotos.length > 0) {
+      doc.setFontSize(14);
+      doc.text("Uploaded Photos", 15, y); y += 8;
+      for (const photo of jobPhotos) {
+        if (y > 240) { doc.addPage(); y = 20; }
+        try {
+          const img = await new Promise<string>((resolve, reject) => {
+            const imgEl = new Image();
+            imgEl.crossOrigin = "anonymous";
+            imgEl.onload = () => {
+              const c = document.createElement("canvas");
+              c.width = imgEl.width; c.height = imgEl.height;
+              c.getContext("2d")!.drawImage(imgEl, 0, 0);
+              resolve(c.toDataURL("image/jpeg"));
+            };
+            imgEl.onerror = reject;
+            imgEl.src = photo.url;
+          });
+          doc.addImage(img, "JPEG", 15, y, 80, 50);
+          y += 55;
+        } catch { y += 5; }
+      }
+    }
+
+    const filename = `system-owner-${job.title.replace(/\s+/g, "_")}.pdf`;
+    const blob = doc.output("blob");
+    const file = new File([blob], filename, { type: "application/pdf" });
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ title: "System Owner Application", files: [file] }).catch(() => {});
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
+    }
+  };
+
   const handleShareOrPrint = async () => {
     if (navigator.share) {
       try {
@@ -494,8 +553,10 @@ export default function JobDetail() {
   const assignedIds = assignments.map((a) => a.scaffolder_id);
   const assignedScaffolderIds = assignments.filter(a => a.assignment_role !== "engineer").map(a => a.scaffolder_id);
   const assignedEngineerIds = assignments.filter(a => a.assignment_role === "engineer").map(a => a.scaffolder_id);
-  const unassignedScaffolders = scaffolders.filter((s) => !assignedScaffolderIds.includes(s.user_id));
-  const unassignedEngineers = engineers.filter((e) => !assignedEngineerIds.includes(e.user_id));
+  const hasScaffolder = assignedScaffolderIds.length > 0;
+  const hasEngineer = assignedEngineerIds.length > 0;
+  const allScaffolders = scaffolders;
+  const allEngineers = engineers;
   const showScheduling = ["scheduled", "in_progress", "quote_submitted", "negotiating"].includes(job.status) || job.scheduled_date;
   const showSiteReport = ["in_progress", "completed"].includes(job.status);
   const canEdit = role === "admin" || (role === "owner" && job.owner_id === user?.id);
@@ -641,19 +702,15 @@ export default function JobDetail() {
             </div>
           )}
 
-          {/* Admin: Assign Scaffolder & Engineer below map */}
+          {/* Admin: Assign/Change Scaffolder & Engineer below map */}
           {role === "admin" && (
             <div className="pt-3 border-t border-border flex flex-wrap gap-2">
-              {unassignedScaffolders.length > 0 && (
-                <Button size="sm" variant="outline" className="text-xs" onClick={() => setAssignOpen(true)}>
-                  <UserPlus className="h-3 w-3 mr-1" /> Assign Scaffolder
-                </Button>
-              )}
-              {unassignedEngineers.length > 0 && (
-                <Button size="sm" variant="outline" className="text-xs" onClick={() => setAssignEngineerOpen(true)}>
-                  <UserPlus className="h-3 w-3 mr-1" /> Assign Engineer
-                </Button>
-              )}
+              <Button size="sm" variant="outline" className="text-xs" onClick={() => setAssignOpen(true)}>
+                <UserPlus className="h-3 w-3 mr-1" /> {hasScaffolder ? "Change Scaffolder" : "Assign Scaffolder"}
+              </Button>
+              <Button size="sm" variant="outline" className="text-xs" onClick={() => setAssignEngineerOpen(true)}>
+                <UserPlus className="h-3 w-3 mr-1" /> {hasEngineer ? "Change Engineer" : "Assign Engineer"}
+              </Button>
             </div>
           )}
 
@@ -681,6 +738,9 @@ export default function JobDetail() {
                 <Button size="sm" variant="outline" className="text-xs" onClick={handleShareOrPrint}>
                   {navigator.share ? <Share2 className="h-3 w-3 mr-1" /> : <Printer className="h-3 w-3 mr-1" />}
                   {navigator.share ? "Share" : "Print / PDF"}
+                </Button>
+                <Button size="sm" variant="outline" className="text-xs" onClick={handleDownloadOwnerPdf}>
+                  <FileText className="h-3 w-3 mr-1" /> System Owner PDF
                 </Button>
               </div>
             </div>
@@ -731,6 +791,57 @@ export default function JobDetail() {
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* Quotes — before photos for scaffolder/engineer */}
+      {(role === "admin" || role === "scaffolder") && (
+        <Collapsible open={quotesOpen} onOpenChange={setQuotesOpen}>
+          <Card className="card-elevated">
+            <CollapsibleTrigger asChild>
+              <CardHeader className="pb-3 cursor-pointer hover:bg-secondary/30 transition-colors rounded-t-xl">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <FileText className="h-4 w-4" /> Quote History <span className="text-xs font-normal text-muted-foreground">({quotes.length})</span>
+                  </CardTitle>
+                  <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", quotesOpen && "rotate-180")} />
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent>
+                {role === "scaffolder" && (
+                  <div className="mb-3">
+                    <Button size="sm" variant="outline" className="text-xs" onClick={() => setQuoteOpen(true)}>
+                      <Send className="h-3 w-3 mr-1" /> Submit Quote
+                    </Button>
+                  </div>
+                )}
+                <QuoteTimeline
+                  quotes={quotes}
+                  profiles={profiles}
+                  showScaffolderName={role === "admin"}
+                  isScaffolder={role === "scaffolder"}
+                  onRespondToCounter={handleScaffolderRespondToCounter}
+                />
+                {role === "admin" && quotes.filter(q => !q.review_decision).length > 0 && (
+                  <div className="mt-4 pt-3 border-t border-border space-y-2">
+                    <p className="text-xs text-muted-foreground font-medium">Pending Actions</p>
+                    {quotes.filter(q => !q.review_decision).map(q => (
+                      <div key={q.id} className="p-2 rounded-lg bg-secondary/30 space-y-2">
+                        <span className="text-sm font-semibold">£{Number(q.amount).toLocaleString()}</span>
+                        <div className="flex flex-wrap gap-2">
+                          <Button size="sm" variant="outline" className="text-xs h-7 flex-1 min-w-[70px] text-success border-success/30" onClick={() => reviewQuote(q.id, "accepted")}>Accept</Button>
+                          <Button size="sm" variant="outline" className="text-xs h-7 flex-1 min-w-[70px] text-destructive border-destructive/30" onClick={() => reviewQuote(q.id, "rejected")}>Reject</Button>
+                          <Button size="sm" variant="outline" className="text-xs h-7 flex-1 min-w-[70px] text-warning border-warning/30" onClick={() => reviewQuote(q.id, "countered")}>Counter</Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
       )}
 
       {/* Photos */}
@@ -898,58 +1009,6 @@ export default function JobDetail() {
         </Card>
       )}
 
-      {/* Quotes — Admin and Scaffolder see timeline */}
-      {(role === "admin" || role === "scaffolder") && (
-        <Collapsible open={quotesOpen} onOpenChange={setQuotesOpen}>
-          <Card className="card-elevated">
-            <CollapsibleTrigger asChild>
-              <CardHeader className="pb-3 cursor-pointer hover:bg-secondary/30 transition-colors rounded-t-xl">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <FileText className="h-4 w-4" /> Quote History <span className="text-xs font-normal text-muted-foreground">({quotes.length})</span>
-                  </CardTitle>
-                  <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", quotesOpen && "rotate-180")} />
-                </div>
-              </CardHeader>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <CardContent>
-                {role === "scaffolder" && (
-                  <div className="mb-3">
-                    <Button size="sm" variant="outline" className="text-xs" onClick={() => setQuoteOpen(true)}>
-                      <Send className="h-3 w-3 mr-1" /> Submit Quote
-                    </Button>
-                  </div>
-                )}
-                <QuoteTimeline
-                  quotes={quotes}
-                  profiles={profiles}
-                  showScaffolderName={role === "admin"}
-                  isScaffolder={role === "scaffolder"}
-                  onRespondToCounter={handleScaffolderRespondToCounter}
-                />
-                {/* Admin review actions for pending quotes */}
-                {role === "admin" && quotes.filter(q => !q.review_decision).length > 0 && (
-                  <div className="mt-4 pt-3 border-t border-border space-y-2">
-                    <p className="text-xs text-muted-foreground font-medium">Pending Actions</p>
-                    {quotes.filter(q => !q.review_decision).map(q => (
-                      <div key={q.id} className="p-2 rounded-lg bg-secondary/30 space-y-2">
-                        <span className="text-sm font-semibold">£{Number(q.amount).toLocaleString()}</span>
-                        <div className="flex flex-wrap gap-2">
-                          <Button size="sm" variant="outline" className="text-xs h-7 flex-1 min-w-[70px] text-success border-success/30" onClick={() => reviewQuote(q.id, "accepted")}>Accept</Button>
-                          <Button size="sm" variant="outline" className="text-xs h-7 flex-1 min-w-[70px] text-destructive border-destructive/30" onClick={() => reviewQuote(q.id, "rejected")}>Reject</Button>
-                          <Button size="sm" variant="outline" className="text-xs h-7 flex-1 min-w-[70px] text-warning border-warning/30" onClick={() => reviewQuote(q.id, "countered")}>Counter</Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </CollapsibleContent>
-          </Card>
-        </Collapsible>
-      )}
-
       {/* Private Chat Channels — Admin↔Scaffolder and Admin↔Engineer only */}
       {role !== "owner" && (
         <Card className="card-elevated">
@@ -1067,18 +1126,18 @@ export default function JobDetail() {
       {/* Assign Scaffolder Dialog */}
       <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
         <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle>Assign Scaffolder</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{hasScaffolder ? "Change Scaffolder" : "Assign Scaffolder"}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             <Select value={selectedScaffolder} onValueChange={setSelectedScaffolder}>
               <SelectTrigger><SelectValue placeholder="Select scaffolder" /></SelectTrigger>
               <SelectContent>
-                {unassignedScaffolders.map((s) => (
+                {allScaffolders.map((s) => (
                   <SelectItem key={s.user_id} value={s.user_id}>{s.first_name} {s.last_name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Button className="w-full" disabled={!selectedScaffolder} onClick={assignScaffolder}>
-              Assign
+              {hasScaffolder ? "Change" : "Assign"}
             </Button>
           </div>
         </DialogContent>
@@ -1087,18 +1146,18 @@ export default function JobDetail() {
       {/* Assign Engineer Dialog */}
       <Dialog open={assignEngineerOpen} onOpenChange={setAssignEngineerOpen}>
         <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle>Assign Engineer</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{hasEngineer ? "Change Engineer" : "Assign Engineer"}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             <Select value={selectedEngineer} onValueChange={setSelectedEngineer}>
               <SelectTrigger><SelectValue placeholder="Select engineer" /></SelectTrigger>
               <SelectContent>
-                {unassignedEngineers.map((e) => (
+                {allEngineers.map((e) => (
                   <SelectItem key={e.user_id} value={e.user_id}>{e.first_name} {e.last_name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Button className="w-full" disabled={!selectedEngineer} onClick={assignEngineer}>
-              Assign
+              {hasEngineer ? "Change" : "Assign"}
             </Button>
           </div>
         </DialogContent>
