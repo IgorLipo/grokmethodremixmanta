@@ -66,11 +66,6 @@ export function QuoteTimeline({
     return "border-muted-foreground/30";
   };
 
-  const getLabel = (d: string | null) => {
-    if (!d) return "Pending Review";
-    return d.charAt(0).toUpperCase() + d.slice(1);
-  };
-
   const fmt = (s: string) =>
     new Date(s).toLocaleDateString("en-GB", {
       day: "numeric",
@@ -80,13 +75,26 @@ export function QuoteTimeline({
       minute: "2-digit",
     });
 
+  // Check if there's a newer quote after a countered one (meaning scaffolder already responded)
+  const hasNewerQuoteAfter = (quoteIndex: number) => {
+    const q = sorted[quoteIndex];
+    if (q.review_decision !== "countered") return false;
+    // Check if any later quote exists from same scaffolder
+    for (let i = quoteIndex + 1; i < sorted.length; i++) {
+      if (sorted[i].scaffolder_id === q.scaffolder_id) return true;
+    }
+    return false;
+  };
+
   return (
     <div className="relative space-y-0">
       {sorted.map((q, i) => {
         const scaffolder = profiles[q.scaffolder_id];
         const isLast = i === sorted.length - 1;
         const isCountered = q.review_decision === "countered";
-        const showRespond = isScaffolder && isCountered && onRespondToCounter;
+        const alreadyResponded = hasNewerQuoteAfter(i);
+        // Only show respond buttons if scaffolder, countered, NOT already responded, and not currently responding to another
+        const showRespond = isScaffolder && isCountered && !alreadyResponded && onRespondToCounter;
 
         return (
           <div key={q.id} className="flex gap-3">
@@ -113,27 +121,40 @@ export function QuoteTimeline({
                     </span>
                   )}
                 </div>
-                <span
-                  className={cn(
-                    "text-[10px] px-2 py-0.5 rounded-full font-medium",
-                    !q.review_decision && "bg-muted text-muted-foreground",
-                    q.review_decision === "accepted" && "bg-success/10 text-success",
-                    q.review_decision === "rejected" && "bg-destructive/10 text-destructive",
-                    q.review_decision === "countered" && "bg-warning/10 text-warning"
-                  )}
-                >
-                  {getLabel(q.review_decision)}
-                </span>
+              </div>
+
+              {/* Prominent status badge */}
+              <div className="mt-1.5">
+                {!q.review_decision && (
+                  <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-bold bg-muted text-muted-foreground border border-border">
+                    <Clock className="h-3.5 w-3.5" /> PENDING REVIEW
+                  </span>
+                )}
+                {q.review_decision === "accepted" && (
+                  <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-bold bg-success/15 text-success border border-success/30">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> ACCEPTED
+                  </span>
+                )}
+                {q.review_decision === "rejected" && (
+                  <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-bold bg-destructive/15 text-destructive border border-destructive/30">
+                    <XCircle className="h-3.5 w-3.5" /> DECLINED
+                  </span>
+                )}
+                {q.review_decision === "countered" && (
+                  <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-bold bg-warning/15 text-warning border border-warning/30">
+                    <RotateCcw className="h-3.5 w-3.5" /> COUNTERED
+                  </span>
+                )}
               </div>
 
               {/* Show counter amount if countered */}
               {isCountered && q.counter_amount && (
-                <div className="mt-1.5 p-2 rounded-lg bg-warning/5 border border-warning/20">
-                  <p className="text-xs text-warning font-medium">
+                <div className="mt-2 p-3 rounded-lg bg-warning/5 border border-warning/20">
+                  <p className="text-sm text-warning font-bold">
                     Counter offer: £{Number(q.counter_amount).toLocaleString()}
                   </p>
                   {q.counter_notes && (
-                    <p className="text-xs text-muted-foreground mt-0.5">{q.counter_notes}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{q.counter_notes}</p>
                   )}
                 </div>
               )}
@@ -150,7 +171,7 @@ export function QuoteTimeline({
                 </p>
               )}
 
-              {/* Scaffolder response to counter */}
+              {/* Scaffolder response to counter — only if not already responded */}
               {showRespond && (
                 <div className="mt-2 space-y-2">
                   {respondingTo === q.id ? (

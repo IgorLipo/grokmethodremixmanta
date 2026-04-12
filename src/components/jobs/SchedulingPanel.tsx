@@ -142,10 +142,6 @@ export function SchedulingPanel({ job, role, onUpdate }: SchedulingPanelProps) {
                 <CalendarPicker mode="single" selected={date} onSelect={setDate} className="p-3 pointer-events-auto" />
               </PopoverContent>
             </Popover>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Duration (hours)</Label>
-              <Input type="number" min={1} max={24} value={duration} onChange={(e) => setDuration(parseInt(e.target.value) || 4)} />
-            </div>
             <Button size="sm" className="w-full" onClick={saveSchedule} disabled={!date || saving}>
               {saving ? "Saving..." : "Set Schedule"}
             </Button>
