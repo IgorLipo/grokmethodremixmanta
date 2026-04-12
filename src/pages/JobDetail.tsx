@@ -100,7 +100,7 @@ const ownerStatusInfo: Record<string, { title: string; message: string }> = {
 interface Quote {
   id: string; amount: number; notes: string; submitted_at: string;
   review_decision: string | null; scaffolder_id: string; reviewed_by: string | null;
-  reviewed_at: string | null;
+  reviewed_at: string | null; counter_amount: number | null; counter_notes: string | null;
 }
 interface Photo {
   id: string; url: string; review_status: string; created_at: string; uploader_id: string | null;
