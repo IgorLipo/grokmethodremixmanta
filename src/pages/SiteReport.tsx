@@ -132,25 +132,48 @@ export default function SiteReport() {
 
   const submitReport = async () => {
     if (!user || !jobId) return;
-    // Save first
-    await saveProgress();
-    if (!reportId && !formData.engineer_name) return;
+    
+    // Validate only required fields
+    if (!formData.engineer_name.trim()) {
+      toast({ title: "Engineer name is required", variant: "destructive" });
+      return;
+    }
+    if (!formData.date_of_visit) {
+      toast({ title: "Date of visit is required", variant: "destructive" });
+      return;
+    }
+    if (!formData.address.trim()) {
+      toast({ title: "Address is required", variant: "destructive" });
+      return;
+    }
 
     setSubmitting(true);
-    const rid = reportId;
+
+    const payload = {
+      report_data: formData,
+      report_photos: { evidence_photos: formData.evidence_photos },
+      status: "submitted",
+      submitted_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    let rid = reportId;
     if (rid) {
-      await (supabase as any).from("site_reports").update({
-        status: "submitted",
-        report_data: formData,
-        report_photos: { evidence_photos: formData.evidence_photos },
-        submitted_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }).eq("id", rid);
+      await (supabase as any).from("site_reports").update(payload).eq("id", rid);
+    } else {
+      const { data } = await (supabase as any).from("site_reports").insert({
+        job_id: jobId,
+        engineer_id: user.id,
+        ...payload,
+      }).select("id").single();
+      if (data) rid = data.id;
+    }
+
+    if (rid) {
       setReportStatus("submitted");
       logAudit(user.id, "site_report_submitted", "site_report", rid, { job_id: jobId });
       notifySiteReportSubmitted(jobId, `Job ${jobId?.slice(0, 8)}`, user.id);
-      toast({ title: "Site report submitted" });
-      // Navigate back to job page
+      toast({ title: "✅ Site report submitted successfully" });
       navigate(`/jobs/${jobId}`);
     }
     setSubmitting(false);
