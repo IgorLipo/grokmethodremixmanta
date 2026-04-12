@@ -464,9 +464,10 @@ export default function OwnerOnboarding() {
                     <CheckCircle2 className="h-3 w-3" /> Uploaded
                   </div>
                   <label className="absolute bottom-2 right-2 cursor-pointer">
-                    <input
+                     <input
                       type="file"
-                      accept="image/*,.pdf,application/pdf"
+                      accept="image/*,application/pdf,.pdf"
+                      capture={undefined}
                       className="hidden"
                       onChange={(e) => {
                         const f = e.target.files?.[0];
@@ -487,7 +488,8 @@ export default function OwnerOnboarding() {
                 <label className="cursor-pointer block">
                   <input
                     type="file"
-                    accept="image/*,.pdf,application/pdf"
+                    accept="image/*,application/pdf,.pdf"
+                    capture={undefined}
                     className="hidden"
                     onChange={(e) => {
                       const f = e.target.files?.[0];
