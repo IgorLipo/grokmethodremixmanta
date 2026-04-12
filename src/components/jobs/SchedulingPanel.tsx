@@ -109,9 +109,7 @@ export function SchedulingPanel({ job, role, onUpdate }: SchedulingPanelProps) {
                 <Calendar className="h-4 w-4 text-primary" />
                 <span className="font-medium">{format(new Date(job.scheduled_date), "EEE, dd MMM yyyy")}</span>
               </div>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Clock className="h-3.5 w-3.5" /> {job.scheduled_duration || 4}h
-              </div>
+            </div>
             </div>
             {job.schedule_response === "confirmed" ? (
               <div className="flex items-center gap-1.5 text-xs text-success">
