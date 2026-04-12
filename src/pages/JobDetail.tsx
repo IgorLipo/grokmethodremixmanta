@@ -396,7 +396,47 @@ export default function JobDetail() {
     }
   };
 
-  const handleEditJob = async () => {
+  const assignEngineer = async () => {
+    if (!selectedEngineer || !id || !user) return;
+    const { error } = await supabase.from("job_assignments").insert({
+      job_id: id, scaffolder_id: selectedEngineer, assigned_by: user.id, assignment_role: "engineer",
+    });
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Engineer assigned" });
+      logAudit(user.id, "engineer_assigned", "assignment", id, { engineer_id: selectedEngineer });
+      notifyEngineerAssigned(selectedEngineer, job.title, id);
+      setAssignEngineerOpen(false);
+      setSelectedEngineer("");
+      fetchAll();
+    }
+  };
+
+  const handleScaffolderRespondToCounter = async (quoteId: string, response: "accepted" | "rejected", newAmount?: number, newNotes?: string) => {
+    if (!user || !id) return;
+    if (response === "accepted") {
+      // Scaffolder accepts the counter — mark the quote as accepted
+      await supabase.from("quotes").update({
+        review_decision: "accepted", reviewed_at: new Date().toISOString(),
+      } as any).eq("id", quoteId);
+      toast({ title: "Counter offer accepted" });
+      logAudit(user.id, "counter_accepted", "quote", quoteId);
+      notifyQuoteSubmitted(id, job.title, 0); // notify admin
+    } else {
+      // Scaffolder declines — submit a new quote with updated amount
+      const amount = newAmount || 0;
+      await supabase.from("quotes").insert({
+        job_id: id, scaffolder_id: user.id, amount, notes: newNotes || "Counter declined — revised offer",
+      });
+      toast({ title: "Revised quote submitted" });
+      logAudit(user.id, "counter_declined_new_quote", "quote", quoteId, { new_amount: amount });
+      notifyQuoteSubmitted(id, job.title, amount);
+    }
+    fetchAll();
+  };
+
+
     if (!id || !user) return;
     setEditSubmitting(true);
     const { error } = await supabase.from("jobs").update({
