@@ -259,7 +259,7 @@ export default function JobDetail() {
     }
   };
 
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, category: string = "general") => {
     const file = e.target.files?.[0];
     if (!file || !id || !user) return;
     setUploading(true);
@@ -272,7 +272,7 @@ export default function JobDetail() {
       return;
     }
     const { data: urlData } = supabase.storage.from("job-photos").getPublicUrl(path);
-    await supabase.from("photos").insert({ job_id: id, uploader_id: user.id, url: urlData.publicUrl, review_status: "pending" });
+    await supabase.from("photos").insert({ job_id: id, uploader_id: user.id, url: urlData.publicUrl, review_status: "pending", photo_category: category } as any);
     toast({ title: "Photo uploaded" });
     logAudit(user.id, "photo_upload", "photo", id);
     notifyPhotoUploaded(id, job.title, adminIds);
@@ -406,13 +406,17 @@ export default function JobDetail() {
   const handleScaffolderRespondToCounter = async (quoteId: string, response: "accepted" | "rejected", newAmount?: number, newNotes?: string) => {
     if (!user || !id) return;
     if (response === "accepted") {
-      // Scaffolder accepts the counter — mark the quote as accepted
+      // Scaffolder accepts the counter — update quote amount to counter_amount and mark accepted
+      const quote = quotes.find(q => q.id === quoteId);
+      const acceptedAmount = quote?.counter_amount || quote?.amount || 0;
       await supabase.from("quotes").update({
-        review_decision: "accepted", reviewed_at: new Date().toISOString(),
+        review_decision: "accepted",
+        reviewed_at: new Date().toISOString(),
+        amount: acceptedAmount,
       } as any).eq("id", quoteId);
-      toast({ title: "Counter offer accepted" });
-      logAudit(user.id, "counter_accepted", "quote", quoteId);
-      notifyQuoteSubmitted(id, job.title, 0); // notify admin
+      toast({ title: `Counter offer of £${Number(acceptedAmount).toLocaleString()} accepted` });
+      logAudit(user.id, "counter_accepted", "quote", quoteId, { accepted_amount: acceptedAmount });
+      notifyQuoteSubmitted(id, job.title, acceptedAmount);
     } else {
       // Scaffolder declines — submit a new quote with updated amount
       const amount = newAmount || 0;
@@ -492,9 +496,33 @@ export default function JobDetail() {
     doc.text(`Created: ${new Date(job.created_at).toLocaleDateString("en-GB")}`, 15, y); y += 7;
     doc.text(`Status: ${statusMap[job.status] || job.status}`, 15, y); y += 12;
 
+    // Add static map image
+    if (mapsKey && job.lat && job.lng) {
+      try {
+        const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${job.lat},${job.lng}&zoom=18&size=600x300&maptype=satellite&markers=color:red%7C${job.lat},${job.lng}&key=${mapsKey}`;
+        const mapImg = await new Promise<string>((resolve, reject) => {
+          const imgEl = new Image();
+          imgEl.crossOrigin = "anonymous";
+          imgEl.onload = () => {
+            const c = document.createElement("canvas");
+            c.width = imgEl.width; c.height = imgEl.height;
+            c.getContext("2d")!.drawImage(imgEl, 0, 0);
+            resolve(c.toDataURL("image/jpeg"));
+          };
+          imgEl.onerror = reject;
+          imgEl.src = mapUrl;
+        });
+        doc.setFontSize(14);
+        doc.text("Property Location", 15, y); y += 8;
+        doc.addImage(mapImg, "JPEG", 15, y, pw - 30, 60);
+        y += 65;
+      } catch { /* map image failed, skip */ }
+    }
+
     // Add photos
     const jobPhotos = photos.filter(p => !new Set(assignments.filter(a => a.assignment_role === "engineer").map((a: any) => a.scaffolder_id)).has(p.uploader_id || "") && !new Set(assignments.filter(a => a.assignment_role !== "engineer").map((a: any) => a.scaffolder_id)).has(p.uploader_id || ""));
     if (jobPhotos.length > 0) {
+      if (y > 200) { doc.addPage(); y = 20; }
       doc.setFontSize(14);
       doc.text("Uploaded Photos", 15, y); y += 8;
       for (const photo of jobPhotos) {
@@ -566,20 +594,28 @@ export default function JobDetail() {
     admin_engineer: [...adminIds],
   };
 
-  // Separate photos by uploader role
+   // Separate photos by uploader role AND category
   const engineerAssignments = assignments.filter(a => a.assignment_role === "engineer");
   const engineerIds = new Set(engineerAssignments.map(a => a.scaffolder_id));
   const scaffolderAssignments = assignments.filter(a => a.assignment_role === "scaffolder" || !a.assignment_role || a.assignment_role === "scaffolder");
   const scaffolderIds = new Set(scaffolderAssignments.map(a => a.scaffolder_id));
   
   const ownerPhotos = photos.filter(p => !engineerIds.has(p.uploader_id || "") && !scaffolderIds.has(p.uploader_id || ""));
-  const scaffolderPhotos = photos.filter(p => scaffolderIds.has(p.uploader_id || ""));
-  const engineerPhotos = photos.filter(p => engineerIds.has(p.uploader_id || ""));
+  const scaffolderBeforePhotos = photos.filter(p => scaffolderIds.has(p.uploader_id || "") && (p as any).photo_category === "before");
+  const scaffolderAfterPhotos = photos.filter(p => scaffolderIds.has(p.uploader_id || "") && (p as any).photo_category === "after");
+  const engineerBeforePhotos = photos.filter(p => engineerIds.has(p.uploader_id || "") && (p as any).photo_category === "before");
+  const engineerAfterPhotos = photos.filter(p => engineerIds.has(p.uploader_id || "") && (p as any).photo_category === "after");
 
-  // Engineer status actions
-  const engineerActions = role === "engineer" && job.status === "in_progress"
-    ? [{ label: "Mark as Finished", status: "completed" }]
-    : [];
+  // Engineer status actions — show Start Working when scheduled, Mark as Finished when in_progress with submitted report
+  const engineerActions: { label: string; status: string }[] = [];
+  if (role === "engineer") {
+    if (job.status === "scheduled") {
+      engineerActions.push({ label: "Start Working", status: "in_progress" });
+    }
+    if (job.status === "in_progress" && siteReport?.status === "submitted") {
+      engineerActions.push({ label: "Mark as Finished", status: "completed" });
+    }
+  }
 
   const ownerStatus = ownerStatusInfo[job.status];
 
@@ -911,27 +947,27 @@ export default function JobDetail() {
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <HardHat className="h-4 w-4" /> Scaffolder Photos
-              <span className="text-xs font-normal text-muted-foreground">({scaffolderPhotos.length})</span>
+              <span className="text-xs font-normal text-muted-foreground">({scaffolderBeforePhotos.length + scaffolderAfterPhotos.length})</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {role === "scaffolder" && (
-              <div className="mb-3">
-                <label className="cursor-pointer">
-                  <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} disabled={uploading} />
-                  <Button size="sm" variant="outline" className="text-xs pointer-events-none" asChild>
-                    <span><Upload className="h-3 w-3 mr-1" />{uploading ? "Uploading…" : "Upload Photo"}</span>
-                  </Button>
-                </label>
+            <div className="border border-border rounded-xl p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Before Scaffolding</p>
+                {role === "scaffolder" && (
+                  <label className="cursor-pointer">
+                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handlePhotoUpload(e, "before")} disabled={uploading} />
+                    <Button size="sm" variant="outline" className="text-xs h-7 pointer-events-none" asChild>
+                      <span><Camera className="h-3 w-3 mr-1" /> Upload Before</span>
+                    </Button>
+                  </label>
+                )}
               </div>
-            )}
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Before Scaffolding</p>
-              {scaffolderPhotos.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-3">No photos yet</p>
+              {scaffolderBeforePhotos.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-3">No before photos yet</p>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {scaffolderPhotos.slice(0, Math.ceil(scaffolderPhotos.length / 2)).map((photo) => (
+                  {scaffolderBeforePhotos.map((photo) => (
                     <div key={photo.id} className="relative rounded-xl overflow-hidden border border-border cursor-pointer" onClick={() => setFullscreenPhoto(photo.url)}>
                       <img src={photo.url} alt="Before scaffolding" className="w-full h-32 object-cover" />
                     </div>
@@ -939,13 +975,23 @@ export default function JobDetail() {
                 </div>
               )}
             </div>
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">After Scaffolding</p>
-              {scaffolderPhotos.length <= 1 ? (
-                <p className="text-sm text-muted-foreground text-center py-3">No photos yet</p>
+            <div className="border border-border rounded-xl p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">After Scaffolding</p>
+                {role === "scaffolder" && (
+                  <label className="cursor-pointer">
+                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handlePhotoUpload(e, "after")} disabled={uploading} />
+                    <Button size="sm" variant="outline" className="text-xs h-7 pointer-events-none" asChild>
+                      <span><Camera className="h-3 w-3 mr-1" /> Upload After</span>
+                    </Button>
+                  </label>
+                )}
+              </div>
+              {scaffolderAfterPhotos.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-3">No after photos yet</p>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {scaffolderPhotos.slice(Math.ceil(scaffolderPhotos.length / 2)).map((photo) => (
+                  {scaffolderAfterPhotos.map((photo) => (
                     <div key={photo.id} className="relative rounded-xl overflow-hidden border border-border cursor-pointer" onClick={() => setFullscreenPhoto(photo.url)}>
                       <img src={photo.url} alt="After scaffolding" className="w-full h-32 object-cover" />
                     </div>
@@ -958,32 +1004,32 @@ export default function JobDetail() {
       )}
 
       {/* Engineer Photos — Before/After Roof Work */}
-      {(role === "engineer" || role === "admin") && showSiteReport && (
+      {(role === "engineer" || role === "admin") && (job.status === "in_progress" || job.status === "completed") && (
         <Card className="card-elevated">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4" /> Engineer Photos
-              <span className="text-xs font-normal text-muted-foreground">({engineerPhotos.length})</span>
+              <span className="text-xs font-normal text-muted-foreground">({engineerBeforePhotos.length + engineerAfterPhotos.length})</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {role === "engineer" && (
-              <div className="mb-3">
-                <label className="cursor-pointer">
-                  <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} disabled={uploading} />
-                  <Button size="sm" variant="outline" className="text-xs pointer-events-none" asChild>
-                    <span><Upload className="h-3 w-3 mr-1" />{uploading ? "Uploading…" : "Upload Photo"}</span>
-                  </Button>
-                </label>
+            <div className="border border-border rounded-xl p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Before Roof Work</p>
+                {role === "engineer" && (
+                  <label className="cursor-pointer">
+                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handlePhotoUpload(e, "before")} disabled={uploading} />
+                    <Button size="sm" variant="outline" className="text-xs h-7 pointer-events-none" asChild>
+                      <span><Camera className="h-3 w-3 mr-1" /> Upload Before</span>
+                    </Button>
+                  </label>
+                )}
               </div>
-            )}
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Before Roof Work</p>
-              {engineerPhotos.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-3">No photos yet</p>
+              {engineerBeforePhotos.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-3">No before photos yet</p>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {engineerPhotos.slice(0, Math.ceil(engineerPhotos.length / 2)).map((photo) => (
+                  {engineerBeforePhotos.map((photo) => (
                     <div key={photo.id} className="relative rounded-xl overflow-hidden border border-border cursor-pointer" onClick={() => setFullscreenPhoto(photo.url)}>
                       <img src={photo.url} alt="Before roof work" className="w-full h-32 object-cover" />
                     </div>
@@ -991,13 +1037,23 @@ export default function JobDetail() {
                 </div>
               )}
             </div>
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">After Roof Work</p>
-              {engineerPhotos.length <= 1 ? (
-                <p className="text-sm text-muted-foreground text-center py-3">No photos yet</p>
+            <div className="border border-border rounded-xl p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">After Roof Work</p>
+                {role === "engineer" && (
+                  <label className="cursor-pointer">
+                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handlePhotoUpload(e, "after")} disabled={uploading} />
+                    <Button size="sm" variant="outline" className="text-xs h-7 pointer-events-none" asChild>
+                      <span><Camera className="h-3 w-3 mr-1" /> Upload After</span>
+                    </Button>
+                  </label>
+                )}
+              </div>
+              {engineerAfterPhotos.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-3">No after photos yet</p>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {engineerPhotos.slice(Math.ceil(engineerPhotos.length / 2)).map((photo) => (
+                  {engineerAfterPhotos.map((photo) => (
                     <div key={photo.id} className="relative rounded-xl overflow-hidden border border-border cursor-pointer" onClick={() => setFullscreenPhoto(photo.url)}>
                       <img src={photo.url} alt="After roof work" className="w-full h-32 object-cover" />
                     </div>
