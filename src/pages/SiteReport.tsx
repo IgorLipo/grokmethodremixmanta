@@ -11,11 +11,12 @@ import { notifySiteReportSubmitted } from "@/hooks/useNotificationTriggers";
 import SiteReportForm, { type ReportFormData, type MaterialRow } from "@/components/site-report/SiteReportForm";
 import { generateSiteReportPdf } from "@/components/site-report/generateSiteReportPdf";
 
-const emptyForm = (address = ""): ReportFormData => ({
+const emptyForm = (address = "", caseNo = ""): ReportFormData => ({
   engineer_name: "",
   date_of_visit: new Date().toISOString().slice(0, 10),
   address,
-  case_no: "",
+  case_no: caseNo,
+  optimizer_no: "",
   site_id: "",
   fse_attendees: "",
   installer_details: "",
@@ -46,47 +47,38 @@ export default function SiteReport() {
     const load = async () => {
       if (!jobId) return;
 
-      // Fetch job address for prefill
-      const { data: job } = await supabase.from("jobs").select("address").eq("id", jobId).maybeSingle();
+      // Fetch job address + case_no for prefill
+      const { data: job } = await supabase.from("jobs").select("address, case_no").eq("id", jobId).maybeSingle();
       const jobAddress = job?.address || "";
+      const jobCaseNo = (job as any)?.case_no || "";
 
       // Fetch existing report
       const { data: report } = await (supabase as any)
-        .from("site_reports")
-        .select("*")
-        .eq("job_id", jobId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .from("site_reports").select("*").eq("job_id", jobId)
+        .order("created_at", { ascending: false }).limit(1).maybeSingle();
 
       if (report) {
         setReportId(report.id);
         setReportStatus(report.status);
-        // Merge saved data with defaults
         const saved = report.report_data || {};
         const photos = report.report_photos || {};
         setFormData({
-          ...emptyForm(jobAddress),
+          ...emptyForm(jobAddress, jobCaseNo),
           ...saved,
-          evidence_photos: Array.isArray(photos.evidence_photos)
-            ? photos.evidence_photos
-            : (saved.evidence_photos || []),
+          case_no: saved.case_no || jobCaseNo,
+          optimizer_no: saved.optimizer_no || report.optimizer_no || "",
+          evidence_photos: Array.isArray(photos.evidence_photos) ? photos.evidence_photos : (saved.evidence_photos || []),
         });
       } else {
-        // Prefill engineer name from profile
         let engineerName = "";
         if (user) {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("first_name, last_name")
-            .eq("user_id", user.id)
-            .maybeSingle();
+          const { data: profile } = await supabase.from("profiles").select("first_name, last_name").eq("user_id", user.id).maybeSingle();
           if (profile) engineerName = `${profile.first_name} ${profile.last_name}`.trim();
         }
         setFormData({
-          ...emptyForm(jobAddress),
+          ...emptyForm(jobAddress, jobCaseNo),
           engineer_name: engineerName,
-          case_no: `MRE-${jobId?.slice(0, 6).toUpperCase()}`,
+          case_no: jobCaseNo || `MRE-${jobId?.slice(0, 6).toUpperCase()}`,
         });
       }
       setLoading(false);
@@ -114,15 +106,14 @@ export default function SiteReport() {
     const payload = {
       report_data: formData,
       report_photos: { evidence_photos: formData.evidence_photos },
+      optimizer_no: formData.optimizer_no || null,
       updated_at: new Date().toISOString(),
     };
     if (reportId) {
       await (supabase as any).from("site_reports").update(payload).eq("id", reportId);
     } else {
       const { data } = await (supabase as any).from("site_reports").insert({
-        job_id: jobId,
-        engineer_id: user.id,
-        ...payload,
+        job_id: jobId, engineer_id: user.id, ...payload,
       }).select("id").single();
       if (data) setReportId(data.id);
     }
@@ -152,6 +143,7 @@ export default function SiteReport() {
     const payload = {
       report_data: formData,
       report_photos: { evidence_photos: formData.evidence_photos },
+      optimizer_no: formData.optimizer_no || null,
       status: "submitted",
       submitted_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),

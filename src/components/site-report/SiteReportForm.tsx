@@ -23,6 +23,7 @@ export interface ReportFormData {
   date_of_visit: string;
   address: string;
   case_no: string;
+  optimizer_no: string;
   site_id: string;
   fse_attendees: string;
   installer_details: string;
@@ -125,12 +126,15 @@ export default function SiteReportForm({ data, onChange, jobId, userId }: Props)
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Case No.">
-              <Input value={data.case_no} onChange={(e) => set("case_no", e.target.value)} placeholder="e.g. MRE-001" />
+              <Input value={data.case_no} onChange={(e) => set("case_no", e.target.value)} placeholder="e.g. SE-2025-001" />
             </Field>
             <Field label="Site ID">
               <Input value={data.site_id} onChange={(e) => set("site_id", e.target.value)} placeholder="e.g. S-12345" />
             </Field>
           </div>
+          <Field label="Optimizer No.">
+            <Input value={data.optimizer_no} onChange={(e) => set("optimizer_no", e.target.value)} placeholder="e.g. OP-44521" />
+          </Field>
           <Field label="FSEs / Other Attendees">
             <Input value={data.fse_attendees} onChange={(e) => set("fse_attendees", e.target.value)} placeholder="Names of attendees" />
           </Field>

@@ -33,6 +33,7 @@ import {
 } from "@/hooks/useNotificationTriggers";
 
 const statusMap: Record<string, string> = {
+  awaiting_owner_details: "Awaiting Owner",
   draft: "Draft", submitted: "Submitted", photo_review: "Photo Review",
   quote_pending: "Quote Pending", quote_submitted: "Quote Submitted",
   negotiating: "Negotiating", scheduled: "Scheduled",
@@ -399,18 +400,20 @@ export default function JobDetail() {
 
   const assignScaffolder = async () => {
     if (!selectedScaffolder || !id || !user) return;
-    // Delete existing scaffolder assignment if changing
-    const existingScaffolder = assignments.find(a => a.assignment_role !== "engineer");
-    if (existingScaffolder) {
-      await supabase.from("job_assignments").delete().eq("id", existingScaffolder.id);
+    // Multi-assignment: do NOT delete existing — just add another
+    // Prevent duplicate of same person
+    const already = assignments.some(a => a.assignment_role !== "engineer" && a.scaffolder_id === selectedScaffolder);
+    if (already) {
+      toast({ title: "Already assigned", description: "This scaffolder is already on the job", variant: "destructive" });
+      return;
     }
     const { error } = await supabase.from("job_assignments").insert({
-      job_id: id, scaffolder_id: selectedScaffolder, assigned_by: user.id,
+      job_id: id, scaffolder_id: selectedScaffolder, assigned_by: user.id, assignment_role: "scaffolder",
     });
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: existingScaffolder ? "Scaffolder changed" : "Scaffolder assigned" });
+      toast({ title: "Scaffolder assigned" });
       logAudit(user.id, "scaffolder_assigned", "assignment", id, { scaffolder_id: selectedScaffolder });
       notifyScaffolderAssigned(selectedScaffolder, job.title, id);
       setAssignOpen(false);
@@ -421,10 +424,10 @@ export default function JobDetail() {
 
   const assignEngineer = async () => {
     if (!selectedEngineer || !id || !user) return;
-    // Delete existing engineer assignment if changing
-    const existingEngineer = assignments.find(a => a.assignment_role === "engineer");
-    if (existingEngineer) {
-      await supabase.from("job_assignments").delete().eq("id", existingEngineer.id);
+    const already = assignments.some(a => a.assignment_role === "engineer" && a.scaffolder_id === selectedEngineer);
+    if (already) {
+      toast({ title: "Already assigned", description: "This engineer is already on the job", variant: "destructive" });
+      return;
     }
     const { error } = await supabase.from("job_assignments").insert({
       job_id: id, scaffolder_id: selectedEngineer, assigned_by: user.id, assignment_role: "engineer",
@@ -432,13 +435,21 @@ export default function JobDetail() {
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: existingEngineer ? "Engineer changed" : "Engineer assigned" });
+      toast({ title: "Engineer assigned" });
       logAudit(user.id, "engineer_assigned", "assignment", id, { engineer_id: selectedEngineer });
       notifyEngineerAssigned(selectedEngineer, job.title, id);
       setAssignEngineerOpen(false);
       setSelectedEngineer("");
       fetchAll();
     }
+  };
+
+  const removeAssignment = async (assignmentId: string) => {
+    if (!user) return;
+    await supabase.from("job_assignments").delete().eq("id", assignmentId);
+    logAudit(user.id, "assignment_removed", "assignment", assignmentId);
+    toast({ title: "Removed" });
+    fetchAll();
   };
 
   const handleScaffolderRespondToCounter = async (quoteId: string, response: "accepted" | "rejected", newAmount?: number, newNotes?: string) => {
@@ -711,11 +722,23 @@ export default function JobDetail() {
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
               <CardTitle className="text-lg">{job.title}</CardTitle>
-              {(job as any).service_type && (
-                <Badge variant="secondary" className="mt-1 text-[10px]">
-                  {(job as any).service_type === "new_job" ? "New Job" : (job as any).service_type === "service" ? "Service" : (job as any).service_type === "full_site_replacement" ? "Full Site Replacement" : (job as any).service_type}
-                </Badge>
-              )}
+              <div className="flex items-center gap-2 flex-wrap mt-1">
+                {job.case_no && (
+                  <Badge variant="outline" className="text-[10px] font-mono border-primary/40 text-primary">
+                    Case No. {job.case_no}
+                  </Badge>
+                )}
+                {(job as any).service_type && (
+                  <Badge variant="secondary" className="text-[10px]">
+                    {(job as any).service_type === "new_job" ? "New Job" : (job as any).service_type === "service" ? "Service" : (job as any).service_type === "full_site_replacement" ? "Full Site Replacement" : (job as any).service_type}
+                  </Badge>
+                )}
+                {(job as any).panel_count != null && (
+                  <Badge variant="secondary" className="text-[10px]">
+                    {(job as any).panel_count} panels
+                  </Badge>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-2">
               {role !== "owner" && (
@@ -774,38 +797,52 @@ export default function JobDetail() {
             </div>
           )}
 
-          {/* Assigned team */}
+          {/* Assigned team — supports multiple */}
           {assignments.length > 0 && role !== "owner" && (
             <div className="pt-3 border-t border-border space-y-1.5">
               {assignments.filter(a => a.assignment_role !== "engineer").map((a) => {
                 const p = profiles[a.scaffolder_id];
                 return (
-                  <div key={a.id} className="flex items-center gap-2 text-sm">
-                    <HardHat className="h-4 w-4 text-primary" />
-                    <span className="font-medium text-foreground">Scaffolder — {p ? `${p.first_name} ${p.last_name}` : "Unassigned"}</span>
+                  <div key={a.id} className="flex items-center justify-between gap-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <HardHat className="h-4 w-4 text-primary" />
+                      <span className="font-medium text-foreground">Scaffolder — {p ? `${p.first_name} ${p.last_name}` : "Unknown"}</span>
+                    </div>
+                    {role === "admin" && (
+                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-destructive" onClick={() => removeAssignment(a.id)}>
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </div>
                 );
               })}
               {assignments.filter(a => a.assignment_role === "engineer").map((a) => {
                 const p = profiles[a.scaffolder_id];
                 return (
-                  <div key={a.id} className="flex items-center gap-2 text-sm">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    <span className="font-medium text-foreground">Engineer — {p ? `${p.first_name} ${p.last_name}` : "Unassigned"}</span>
+                  <div key={a.id} className="flex items-center justify-between gap-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-primary" />
+                      <span className="font-medium text-foreground">Engineer — {p ? `${p.first_name} ${p.last_name}` : "Unknown"}</span>
+                    </div>
+                    {role === "admin" && (
+                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-destructive" onClick={() => removeAssignment(a.id)}>
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </div>
                 );
               })}
             </div>
           )}
 
-          {/* Admin: Assign/Change Scaffolder & Engineer below map */}
+          {/* Admin: Assign more — multi-assign supported */}
           {role === "admin" && (
             <div className="pt-3 border-t border-border flex flex-wrap gap-2">
               <Button size="sm" variant="outline" className="text-xs" onClick={() => setAssignOpen(true)}>
-                <UserPlus className="h-3 w-3 mr-1" /> {hasScaffolder ? "Change Scaffolder" : "Assign Scaffolder"}
+                <UserPlus className="h-3 w-3 mr-1" /> {hasScaffolder ? "Add Another Scaffolder" : "Assign Scaffolder"}
               </Button>
               <Button size="sm" variant="outline" className="text-xs" onClick={() => setAssignEngineerOpen(true)}>
-                <UserPlus className="h-3 w-3 mr-1" /> {hasEngineer ? "Change Engineer" : "Assign Engineer"}
+                <UserPlus className="h-3 w-3 mr-1" /> {hasEngineer ? "Add Another Engineer" : "Assign Engineer"}
               </Button>
             </div>
           )}
@@ -1242,19 +1279,39 @@ export default function JobDetail() {
       {/* Assign Scaffolder Dialog */}
       <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
         <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle>{hasScaffolder ? "Change Scaffolder" : "Assign Scaffolder"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{hasScaffolder ? "Add Another Scaffolder" : "Assign Scaffolder"}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             <Select value={selectedScaffolder} onValueChange={setSelectedScaffolder}>
               <SelectTrigger><SelectValue placeholder="Select scaffolder" /></SelectTrigger>
               <SelectContent>
-                {allScaffolders.map((s) => (
-                  <SelectItem key={s.user_id} value={s.user_id}>{s.first_name} {s.last_name}</SelectItem>
-                ))}
+                {allScaffolders
+                  .filter(s => !assignments.some(a => a.assignment_role !== "engineer" && a.scaffolder_id === s.user_id))
+                  .map((s) => (
+                    <SelectItem key={s.user_id} value={s.user_id}>{s.first_name} {s.last_name}</SelectItem>
+                  ))}
               </SelectContent>
             </Select>
-            <Button className="w-full" disabled={!selectedScaffolder} onClick={assignScaffolder}>
-              {hasScaffolder ? "Change" : "Assign"}
-            </Button>
+            <Button className="w-full" disabled={!selectedScaffolder} onClick={assignScaffolder}>Assign</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign Engineer Dialog */}
+      <Dialog open={assignEngineerOpen} onOpenChange={setAssignEngineerOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>{hasEngineer ? "Add Another Engineer" : "Assign Engineer"}</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <Select value={selectedEngineer} onValueChange={setSelectedEngineer}>
+              <SelectTrigger><SelectValue placeholder="Select engineer" /></SelectTrigger>
+              <SelectContent>
+                {allEngineers
+                  .filter(e => !assignments.some(a => a.assignment_role === "engineer" && a.scaffolder_id === e.user_id))
+                  .map((e) => (
+                    <SelectItem key={e.user_id} value={e.user_id}>{e.first_name} {e.last_name}</SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <Button className="w-full" disabled={!selectedEngineer} onClick={assignEngineer}>Assign</Button>
           </div>
         </DialogContent>
       </Dialog>

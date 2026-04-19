@@ -17,6 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import mantaLogo from "@/assets/manta-logo.png";
 
 interface NavItem {
   path: string;
@@ -68,8 +69,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         )}
       >
         <div className="flex items-center gap-3 px-4 h-16 border-b border-sidebar-border">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <HardHat className="h-5 w-5" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/5 overflow-hidden">
+            <img src={mantaLogo} alt="Manta Ray Energy" className="h-8 w-8 object-contain" />
           </div>
           {sidebarOpen && (
             <div className="animate-fade-in">
@@ -130,8 +131,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Mobile Header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-sidebar text-sidebar-foreground h-14 flex items-center justify-between px-4">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <HardHat className="h-4 w-4" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 overflow-hidden">
+            <img src={mantaLogo} alt="Manta Ray Energy" className="h-7 w-7 object-contain" />
           </div>
           <span className="text-sm font-semibold">Manta Ray Energy</span>
         </div>
