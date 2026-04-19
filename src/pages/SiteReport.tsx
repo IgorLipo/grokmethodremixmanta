@@ -41,16 +41,18 @@ export default function SiteReport() {
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [reportStatus, setReportStatus] = useState("draft");
+  const [panelCount, setPanelCount] = useState<number | null>(null);
 
   // Load existing report + job address
   useEffect(() => {
     const load = async () => {
       if (!jobId) return;
 
-      // Fetch job address + case_no for prefill
-      const { data: job } = await supabase.from("jobs").select("address, case_no").eq("id", jobId).maybeSingle();
+      // Fetch job address + case_no + panel_count for prefill
+      const { data: job } = await supabase.from("jobs").select("address, case_no, panel_count").eq("id", jobId).maybeSingle();
       const jobAddress = job?.address || "";
       const jobCaseNo = (job as any)?.case_no || "";
+      setPanelCount((job as any)?.panel_count ?? null);
 
       // Fetch existing report
       const { data: report } = await (supabase as any)
@@ -175,7 +177,7 @@ export default function SiteReport() {
     if (!jobId) return;
     toast({ title: "Generating PDF..." });
     try {
-      const blob = await generateSiteReportPdf(formData, jobId);
+      const blob = await generateSiteReportPdf(formData, jobId, { panelCount });
       const file = new File([blob], `site-report-${jobId.slice(0, 8)}.pdf`, { type: "application/pdf" });
 
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
