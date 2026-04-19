@@ -127,9 +127,51 @@ export type Database = {
           },
         ]
       }
+      job_invites: {
+        Row: {
+          created_at: string
+          created_by: string
+          expires_at: string
+          id: string
+          job_id: string
+          token: string
+          used_at: string | null
+          used_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          expires_at?: string
+          id?: string
+          job_id: string
+          token: string
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          expires_at?: string
+          id?: string
+          job_id?: string
+          token?: string
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_invites_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       jobs: {
         Row: {
           address: string
+          case_no: string | null
           completion_date: string | null
           completion_notes: string | null
           created_at: string
@@ -139,6 +181,7 @@ export type Database = {
           lat: number | null
           lng: number | null
           owner_id: string | null
+          panel_count: number | null
           region_id: string | null
           schedule_confirmed: boolean | null
           schedule_notes: string | null
@@ -152,6 +195,7 @@ export type Database = {
         }
         Insert: {
           address?: string
+          case_no?: string | null
           completion_date?: string | null
           completion_notes?: string | null
           created_at?: string
@@ -161,6 +205,7 @@ export type Database = {
           lat?: number | null
           lng?: number | null
           owner_id?: string | null
+          panel_count?: number | null
           region_id?: string | null
           schedule_confirmed?: boolean | null
           schedule_notes?: string | null
@@ -174,6 +219,7 @@ export type Database = {
         }
         Update: {
           address?: string
+          case_no?: string | null
           completion_date?: string | null
           completion_notes?: string | null
           created_at?: string
@@ -183,6 +229,7 @@ export type Database = {
           lat?: number | null
           lng?: number | null
           owner_id?: string | null
+          panel_count?: number | null
           region_id?: string | null
           schedule_confirmed?: boolean | null
           schedule_notes?: string | null
@@ -427,6 +474,7 @@ export type Database = {
           engineer_id: string
           id: string
           job_id: string
+          optimizer_no: string | null
           report_data: Json
           report_photos: Json
           status: string
@@ -438,6 +486,7 @@ export type Database = {
           engineer_id: string
           id?: string
           job_id: string
+          optimizer_no?: string | null
           report_data?: Json
           report_photos?: Json
           status?: string
@@ -449,6 +498,7 @@ export type Database = {
           engineer_id?: string
           id?: string
           job_id?: string
+          optimizer_no?: string | null
           report_data?: Json
           report_photos?: Json
           status?: string
@@ -495,6 +545,7 @@ export type Database = {
         }
         Returns: {
           address: string
+          case_no: string | null
           completion_date: string | null
           completion_notes: string | null
           created_at: string
@@ -504,6 +555,7 @@ export type Database = {
           lat: number | null
           lng: number | null
           owner_id: string | null
+          panel_count: number | null
           region_id: string | null
           schedule_confirmed: boolean | null
           schedule_notes: string | null
@@ -541,10 +593,12 @@ export type Database = {
         Args: { _job_id: string; _user_id: string }
         Returns: boolean
       }
+      redeem_job_invite: { Args: { _token: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "owner" | "scaffolder" | "engineer"
       job_status:
+        | "awaiting_owner_details"
         | "draft"
         | "submitted"
         | "photo_review"
@@ -686,6 +740,7 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "owner", "scaffolder", "engineer"],
       job_status: [
+        "awaiting_owner_details",
         "draft",
         "submitted",
         "photo_review",

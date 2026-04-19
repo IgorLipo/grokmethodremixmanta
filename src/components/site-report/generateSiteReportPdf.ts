@@ -99,6 +99,7 @@ export async function generateSiteReportPdf(data: ReportFormData, jobId: string)
     ["Date of Visit", data.date_of_visit ? new Date(data.date_of_visit + "T00:00:00").toLocaleDateString("en-GB") : ""],
     ["Address", data.address],
     ["Case No.", data.case_no],
+    ["Optimizer No.", data.optimizer_no],
     ["Site ID", data.site_id],
     ["FSEs / Attendees", data.fse_attendees],
     ["Installer Details", data.installer_details],
